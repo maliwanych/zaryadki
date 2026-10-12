@@ -1,11 +1,13 @@
 // Service worker: makes the app open without internet and delivers updates.
 // To ship an update, change VERSION — phones will offer "Доступна новая версия".
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const CACHE = "zaryadki-" + VERSION;
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  // cache: "reload" — straight from the server: the browser may keep an old index.html for 10 minutes
+  // (GitHub Pages max-age=600), and the new version would otherwise store the old page
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: "reload" })))));
 });
 
 self.addEventListener("activate", e => {
