@@ -174,11 +174,14 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .welcome .row{display:flex;gap:10px;flex-wrap:wrap}
 .welcome .btn{flex:1 1 140px}
 .ver{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+.imp{margin:0 0 10px;font-size:15px}
+.imp.warn{color:var(--red);font-weight:500}
 </style>
 </head>
 <body>
 <main>
   <div class="banner" id="updBanner" hidden><span>Доступна новая версия</span><button class="link-btn" id="btnUpdate">Обновить</button></div>
+  <div class="banner" id="undoBanner" hidden><span>Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
   <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
   <h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1>
   <div class="welcome" id="welcome" hidden>
@@ -329,6 +332,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <label class="full">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик, например 60,2"></label>
     <p class="hint full">Пробег при покупке нужен, чтобы не считать чужие километры. Если не знаете, с каким запасом отдали машину, оставьте пустым — стоимость километра покажется диапазоном. Ёмкость нужна для расчёта реального запаса хода.</p>
   </div>
+  <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после загрузки пропадут" hidden style="width:100%;margin-top:14px"></button>
   <div class="sheet-actions">
     <button type="button" class="btn" data-close>Отмена</button>
     <button type="submit" class="btn primary">Сохранить</button>
@@ -396,6 +400,18 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
 </form></dialog>
 
+<dialog id="dlgImport"><form class="sheet" id="formImport" method="dialog">
+  <h2>Заменить данные копией?</h2>
+  <p class="imp" id="impCopy"></p>
+  <p class="imp" id="impNow"></p>
+  <p class="imp warn" id="impLost" hidden></p>
+  <p class="hint">Данные на телефоне будут заменены копией. Если передумаете — «Вернуть как было» сразу после загрузки или в настройках.</p>
+  <div class="sheet-actions">
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary" id="btnImportOk">Заменить</button>
+  </div>
+</form></dialog>
+
 <datalist id="costNotes">
   <option value="Страховка"></option><option value="Шины"></option><option value="ТО"></option>
   <option value="Мойка"></option><option value="Шиномонтаж"></option><option value="Парковка"></option>
@@ -404,8 +420,12 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 
 <script>
 (function(){
+// "YYYY-MM-DD" by the phone's clock (toISOString would give the UTC date: before 03:00 in Minsk that is yesterday)
+function localDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+// same day n months later; 31 Jan + 1 month = end of February, not 3 March
+function addMonths(d,n){ const x=new Date(d.getFullYear(), d.getMonth()+n, 1); x.setDate(Math.min(d.getDate(), new Date(x.getFullYear(), x.getMonth()+1, 0).getDate())); return x; }
 const TYPES = {ac:{name:"AC, медленная",cls:"t-ac",var:"--ac"}, dc:{name:"DC в городе",cls:"t-dc",var:"--dc"}, hwy:{name:"DC на трассе",cls:"t-hwy",var:"--hwy"}};
-const S = {sessions:[], settings:{purchaseDate:new Date().toISOString().slice(0,10), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], loaded:{s:false,set:false,cur:false}};
+const S = {sessions:[], settings:{purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], loaded:{s:false,set:false,cur:false}};
 let lastTotal = 0, db = null, downloads = null, editingId = null, editingRef = null, editingCost = null, editingRem = null, bynTouched = false, curType = "dc", firstPaint = true;
 
 const $ = id => document.getElementById(id);
@@ -413,7 +433,7 @@ const num = v => { if (v===null||v===undefined) return null; const s=String(v).r
 const fmt = (n,d=2) => n.toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmtInt = n => Math.round(n).toLocaleString("ru-RU");
 const pad = n => String(n).padStart(2,"0");
-const nowLocal = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const nowLocal = () => { const d=new Date(); return `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const cssv = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const glitch = s => (s.kwh||0) < 1;
 const isFree = s => !glitch(s) && (s.byn||0)===0;
@@ -423,7 +443,8 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.0.2";
+const DB_KEY = "ev-tracker";
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
 function LocalDB(key){
@@ -567,7 +588,11 @@ function render(){
   $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} BYN` : "—";
   $("fSavedL").textContent = st.freeKwh>0 ? `сэкономлено на бесплатных ${fmt(st.freeKwh,0)} кВт·ч` : "сэкономлено на бесплатных зарядках";
   const notes = [];
-  if(st.kmR>0){
+  if(st.kmR>0 && st.paid<=0){
+    // came with more range than is paid for so far (e.g. 10 km after purchase): the figures would be negative
+    $("fPer100").textContent="—"; $("fCons").textContent="—";
+    notes.push("Пока мало данных: машину отдали с бо́льшим запасом хода, чем оплачено сейчас. Цена и расход появятся после следующих зарядок и обновления пробега.");
+  } else if(st.kmR>0){
     const hi = st.paidMin!=null ? st.paidMin : st.kmR;     // unknown start range: from "came full-ish" …
     const lo = st.paid;                                     // … to "came empty"
     const perHi = st.pByn/hi*100, perLo = st.pByn/lo*100, cHi = st.pKwh/hi*100, cLo = st.pKwh/lo*100;
@@ -762,7 +787,7 @@ function renderReminders(){
     const b=document.createElement("button"); b.type="button"; b.className="rowline";
     const parts=[];
     if(kmLeft!=null) parts.push(kmLeft>0?`через ${fmtInt(kmLeft)} км`:`просрочено на ${fmtInt(-kmLeft)} км`);
-    if(daysLeft!=null) parts.push(daysLeft>0?`через ${daysLeft} дн.`:`срок прошёл`);
+    if(daysLeft!=null) parts.push(daysLeft>0?`через ${daysLeft} дн.`:daysLeft===0?"сегодня":"срок прошёл");
     const warn=(kmLeft!=null&&kmLeft<500)||(daysLeft!=null&&daysLeft<7);
     if(warn) b.classList.add("warn");
     const sub=[]; if(r.everyKm) sub.push(`каждые ${fmtInt(r.everyKm)} км`);
@@ -907,10 +932,11 @@ $("formSess").addEventListener("submit",async e=>{
   }catch(err){ toast(err&&err.code==="quota_exceeded"?"Хранилище заполнено":"Не сохранилось"+(err&&err.code?` (${err.code})`:"")+". Повторите"); }
   finally{ btn.disabled=false; }
 });
-function armDelete(btn, action){
+// first tap arms the button, the second one within 4 s does it
+function armConfirm(btn, action){
   btn.addEventListener("click", async()=>{
     if(btn.dataset.armed!=="1"){
-      btn.dataset.armed="1"; btn.textContent="Точно удалить?";
+      btn.dataset.armed="1"; btn.textContent=btn.dataset.armedLabel||"Точно удалить?";
       clearTimeout(btn._t); btn._t=setTimeout(()=>disarm(btn),4000); return;
     }
     disarm(btn); btn.disabled=true;
@@ -919,8 +945,8 @@ function armDelete(btn, action){
     finally{ btn.disabled=false; }
   });
 }
-function disarm(btn){ btn.dataset.armed=""; btn.textContent="Удалить"; clearTimeout(btn._t); }
-armDelete($("btnDel"), async()=>{ if(!editingId||!db) return; await db.collection("sessions").doc(editingId).delete(); $("dlgSess").close(); toast("Зарядка удалена"); });
+function disarm(btn){ btn.dataset.armed=""; btn.textContent=btn.dataset.label||"Удалить"; clearTimeout(btn._t); }
+armConfirm($("btnDel"), async()=>{ if(!editingId||!db) return; await db.collection("sessions").doc(editingId).delete(); $("dlgSess").close(); toast("Зарядка удалена"); });
 
 $("btnOdo").addEventListener("click",()=>{ const f=$("formOdo"); f.odo.value=curOdo()||""; f.range.value=""; $("dlgOdo").showModal(); f.range.focus(); });
 $("formOdo").addEventListener("submit",async e=>{
@@ -932,7 +958,10 @@ $("formOdo").addEventListener("submit",async e=>{
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
-function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; $("dlgSet").showModal(); }
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??"";
+  const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
+  if(u) b.dataset.label=`Вернуть данные до загрузки копии (${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})})`;
+  disarm(b); $("dlgSet").showModal(); }
 $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
 $("formSet").addEventListener("submit",async e=>{
@@ -955,7 +984,7 @@ $("formRef").addEventListener("submit",async e=>{
     await ref.set({...kept(S.refunds,editingRef), byn, date:f.date.value||null, note:f.note.value.trim()}); $("dlgRef").close(); toast("Возврат сохранён"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
-armDelete($("btnRefDel"), async()=>{ if(!editingRef||!db) return; await db.collection("refunds").doc(editingRef).delete(); $("dlgRef").close(); toast("Возврат удалён"); });
+armConfirm($("btnRefDel"), async()=>{ if(!editingRef||!db) return; await db.collection("refunds").doc(editingRef).delete(); $("dlgRef").close(); toast("Возврат удалён"); });
 
 let costKind="run";
 function setCostKind(k){ costKind=k;
@@ -982,7 +1011,7 @@ $("formCost").addEventListener("submit",async e=>{
     $("dlgCost").close(); toast("Расход сохранён"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
-armDelete($("btnCostDel"), async()=>{ if(!editingCost||!db) return; await db.collection("costs").doc(editingCost).delete(); $("dlgCost").close(); toast("Расход удалён"); });
+armConfirm($("btnCostDel"), async()=>{ if(!editingCost||!db) return; await db.collection("costs").doc(editingCost).delete(); $("dlgCost").close(); toast("Расход удалён"); });
 
 function openRem(r){
   const f=$("formRem"); f.reset(); editingRem=r?r.id:null; $("btnRemDel").hidden=!r; disarm($("btnRemDel"));
@@ -1008,13 +1037,13 @@ $("formRem").addEventListener("submit",async e=>{
 $("btnRemDone").addEventListener("click",async()=>{
   if(!editingRem||!db) return; const r=S.reminders.find(x=>x.id===editingRem); if(!r) return;
   const today=new Date(); const upd={...r}; delete upd.id;
-  upd.lastOdo=curOdo()||upd.lastOdo; upd.lastDate=today.toISOString().slice(0,10);
-  if(r.everyMonths){ const d=new Date(today); d.setMonth(d.getMonth()+r.everyMonths); upd.dueDate=d.toISOString().slice(0,10); }
+  upd.lastOdo=curOdo()||upd.lastOdo; upd.lastDate=localDate(today);
+  if(r.everyMonths) upd.dueDate=localDate(addMonths(today,r.everyMonths));
   else if(r.dueDate) upd.dueDate=null;
   try{ await db.collection("reminders").doc(editingRem).set(upd); $("dlgRem").close(); toast("Отметил выполненным"); }
   catch(e){ toast("Не сохранилось. Повторите"); }
 });
-armDelete($("btnRemDel"), async()=>{ if(!editingRem||!db) return; await db.collection("reminders").doc(editingRem).delete(); $("dlgRem").close(); toast("Напоминание удалено"); });
+armConfirm($("btnRemDel"), async()=>{ if(!editingRem||!db) return; await db.collection("reminders").doc(editingRem).delete(); $("dlgRem").close(); toast("Напоминание удалено"); });
 
 /* ---------- quick entry ---------- */
 function applyPriceHint(){
@@ -1039,7 +1068,7 @@ $("btnCsv").addEventListener("click",async()=>{
   const rows=[["Дата","Время","Станция","Тип","кВт·ч из сети","BYN","BYN/кВт·ч","Одометр","% после","кВт·ч в батарею"]];
   S.sessions.slice().sort((a,b)=>a.ts<b.ts?-1:1).forEach(s=>rows.push([s.ts.slice(0,10),s.ts.slice(11,16),s.station||"",(TYPES[s.type]||TYPES.dc).name,fmt(s.kwh),fmt(s.byn),s.kwh?fmt(s.byn/s.kwh,3):"",s.odo??"",s.socTo??"",s.kwhBat!=null?fmt(s.kwhBat):""]));
   const csv="\uFEFF"+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;}).join(";")).join("\r\n");
-  try{ await downloads.save({filename:`zaryadki-${new Date().toISOString().slice(0,10)}.csv`, data:csv}); toast("Файл сохранён"); }
+  try{ await downloads.save({filename:`zaryadki-${localDate(new Date())}.csv`, data:csv}); toast("Файл сохранён"); }
   catch(err){ if(err&&err.code!=="declined") toast("Не получилось сохранить файл"); }
 });
 
@@ -1047,7 +1076,7 @@ $("btnJson").addEventListener("click",async()=>{
   if(!downloads) return;
   const strip = a => a.map(({id,...d})=>({id,...d}));
   const data={exportedAt:new Date().toISOString(), settings:S.settings, current:S.current, sessions:strip(S.sessions), odo:strip(S.odoLog), refunds:strip(S.refunds), costs:strip(S.costs), reminders:strip(S.reminders)};
-  try{ await downloads.save({filename:`zaryadki-backup-${new Date().toISOString().slice(0,10)}.json`, data:JSON.stringify(data,null,2)});
+  try{ await downloads.save({filename:`zaryadki-backup-${localDate(new Date())}.json`, data:JSON.stringify(data,null,2)});
     await db.doc("meta/backup").set({date:new Date().toISOString()}); toast("Копия сохранена"); }
   catch(err){ if(err&&err.code!=="declined") toast("Не получилось сохранить файл"); }
 });
@@ -1062,8 +1091,6 @@ $("fileImport").addEventListener("change",async e=>{
   let data;
   try{ data=JSON.parse(await file.text()); }catch(err){ toast("Это не файл резервной копии"); return; }
   if(!data || !Array.isArray(data.sessions)){ toast("В файле нет зарядок — это не резервная копия трекера"); return; }
-  const hasData = S.sessions.length||S.costs.length||S.odoLog.length;
-  if(hasData && !confirmReplace()) { toast("Нажмите «Загрузить копию» ещё раз, чтобы заменить текущие данные"); return; }
   const docs={}; let skipped=0;
   const put=(c,arr,numFields,fix=d=>d)=>{ if(!Array.isArray(arr)) return 0; let n=0;
     arr.forEach(r=>{ const c0=cleanRecord(r,numFields), d=c0&&fix(c0); if(!d){ skipped++; return; }
@@ -1078,9 +1105,49 @@ $("fileImport").addEventListener("change",async e=>{
   const current=cleanRecord(data.current,["odo","range"]);
   if(current) docs["meta/current"]=current;
   docs["meta/backup"]={date:data.exportedAt||new Date().toISOString()};
-  try{ db.replaceAll(docs); toast(`Загружено: ${nSess} ${plural(nSess,"зарядка","зарядки","зарядок")}`+(skipped?`. Пропущено записей с ошибками: ${skipped}`:"")); }
-  catch(err){ toast("Не получилось сохранить — не хватает места"); }
+  const done=`Загружено: ${nSess} ${plural(nSess,"зарядка","зарядки","зарядок")}`+(skipped?`. Пропущено записей с ошибками: ${skipped}`:"");
+  const now=phoneCounts();
+  if(!S.configured && !Object.values(now).some(Boolean)){ applyImport(docs,done,false); return; }
+  // something is on the phone: show what replaces what, and what would be lost
+  const copy={}; Object.keys(COLL).forEach(c=>{ copy[c]=Object.keys(docs).filter(k=>k.startsWith(c+"/")).length; });
+  const lost={}; Object.entries(COLL).forEach(([c,get])=>{ lost[c]=get().filter(x=>!docs[`${c}/${x.id}`]).length; });
+  const when=data.exportedAt&&!isNaN(new Date(data.exportedAt)) ? ` от ${new Date(data.exportedAt).toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}` : "";
+  $("impCopy").textContent=`В копии${when}: ${countText(copy)}.`;
+  $("impNow").textContent=`Сейчас на телефоне: ${countText(now)}.`;
+  const lostText=countText(lost,"");
+  $("impLost").hidden=!lostText; $("impLost").textContent=lostText?`⚠️ На телефоне есть записи, которых нет в копии, — они пропадут: ${lostText}.`:"";
+  pendingImport={docs,done};
+  $("dlgImport").showModal();
 });
+let pendingImport=null;
+$("formImport").addEventListener("submit",e=>{ e.preventDefault(); const p=pendingImport; pendingImport=null; $("dlgImport").close(); if(p) applyImport(p.docs,p.done,true); });
+$("dlgImport").addEventListener("close",()=>{ pendingImport=null; });
+const COLL={sessions:()=>S.sessions, costs:()=>S.costs, reminders:()=>S.reminders, odo:()=>S.odoLog, refunds:()=>S.refunds};
+const COUNT_WORDS={sessions:["зарядка","зарядки","зарядок"], costs:["расход","расхода","расходов"], reminders:["напоминание","напоминания","напоминаний"],
+  odo:["замер пробега","замера пробега","замеров пробега"], refunds:["возврат за поездку","возврата за поездки","возвратов за поездки"]};
+const phoneCounts=()=>Object.fromEntries(Object.entries(COLL).map(([c,get])=>[c,get().length]));
+const countText=(counts,none="нет записей")=>Object.keys(COUNT_WORDS).filter(c=>counts[c]).map(c=>`${counts[c]} ${plural(counts[c],...COUNT_WORDS[c])}`).join(", ")||none;
+
+/* ---------- undo the last import: the replaced data is kept on this phone until the next import ---------- */
+const UNDO_KEY=DB_KEY+"-undo";
+function applyImport(docs,done,keepUndo){
+  try{ const before=localStorage.getItem(DB_KEY);
+    if(keepUndo&&before) localStorage.setItem(UNDO_KEY, JSON.stringify({at:new Date().toISOString(), data:before}));
+    else localStorage.removeItem(UNDO_KEY);
+  }catch(e){ try{ localStorage.removeItem(UNDO_KEY); }catch(_){} }   // no room for the undo copy: an older one must not stay behind
+  try{ db.replaceAll(docs); toast(done); }
+  catch(err){ toast("Не получилось сохранить — не хватает места"); return; }
+  if(keepUndo&&readUndo()){ $("undoBanner").hidden=false; clearTimeout(applyImport._t); applyImport._t=setTimeout(()=>{ $("undoBanner").hidden=true; },10000); }
+}
+function readUndo(){ try{ const u=JSON.parse(localStorage.getItem(UNDO_KEY)||"null"); return u&&u.data?u:null; }catch(e){ return null; } }
+async function undoImport(){
+  const u=readUndo(); if(!u) return;
+  db.replaceAll(JSON.parse(u.data).docs||{});   // throws on a full storage → the caller shows a toast
+  localStorage.removeItem(UNDO_KEY);
+  $("undoBanner").hidden=true; toast("Данные возвращены, как были до загрузки копии");
+}
+$("btnUndo").addEventListener("click",()=>undoImport().catch(()=>toast("Не получилось вернуть. Повторите")));
+armConfirm($("btnUndoImport"), async()=>{ try{ await undoImport(); }catch(e){ toast("Не получилось вернуть. Повторите"); return; } $("dlgSet").close(); });
 // a backup can be hand-edited or come from an older tracker: keep what is usable, drop what would break every render
 function cleanRecord(r,numFields){
   if(!r||typeof r!=="object"||Array.isArray(r)) return null;
@@ -1089,8 +1156,6 @@ function cleanRecord(r,numFields){
   return d;
 }
 const validTs = ts => typeof ts==="string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ts) && !isNaN(new Date(ts));
-let replaceArmedAt=0;
-function confirmReplace(){ const now=Date.now(); if(now-replaceArmedAt<15000){ replaceArmedAt=0; return true; } replaceArmedAt=now; return false; }
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){
@@ -1107,13 +1172,13 @@ function backupNag(){
 setTab("overview");
 render();
 (()=>{
-  db = LocalDB("ev-tracker");
+  db = LocalDB(DB_KEY);
   downloads = { save: saveFile };
   $("btnAdd").disabled=false; $("btnCsv").hidden=false; $("btnJson").hidden=false;
   $("appVer").textContent = APP_VERSION;
   const onErr = ()=>{};
   db.collection("sessions").onSnapshot(snap=>{ S.sessions=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.doc("meta/settings").onSnapshot(snap=>{ S.configured=snap.exists; S.settings={purchaseDate:new Date().toISOString().slice(0,10), startOdo:0, startRange:null, carName:"", ...(snap.exists?snap.data():{})}; render(); }, onErr);
+  db.doc("meta/settings").onSnapshot(snap=>{ S.configured=snap.exists; S.settings={purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:"", ...(snap.exists?snap.data():{})}; render(); }, onErr);
   db.doc("meta/backup").onSnapshot(snap=>{ S.backup=snap.exists?snap.data():null; render(); }, onErr);
   db.collection("costs").onSnapshot(snap=>{ S.costs=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
   db.collection("reminders").onSnapshot(snap=>{ S.reminders=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
