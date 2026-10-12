@@ -470,6 +470,68 @@ test("счётчик добавляет разряд после 99 999,99", asyn
   await expect(page.locator("#regByn")).toHaveAttribute("aria-label", /^123\s456,78$/); // тысячи разделяет неразрывный пробел
 });
 
+test.describe("пример с данными", () => {
+  const stored = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
+
+  test("открывается из приветствия, всё посчитано, переживает перезагрузку, «Выйти» стирает", async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnDemo");
+    await expect(page.locator("#demoBanner")).toBeVisible();
+    await expect(page.locator("#welcome")).toBeHidden();
+    await expect(page.locator("#carName")).toContainText("пример");
+    expect(num(await page.locator("#fPer100").textContent())).toBeGreaterThan(0);
+    expect(num(await page.locator("#fCons").textContent())).toBeGreaterThan(5);
+    await expect(page.locator("#f2fSec")).toBeVisible();          // точный расход и реальный запас
+    await expect(page.locator("#f2f")).toContainText("реальный запас");
+    await expect(page.locator("#fSaved")).toContainText("BYN");    // бесплатные зарядки на работе
+    await page.click("[data-tab=sessions]");
+    expect(await page.locator("#list .sess").count()).toBeGreaterThan(10);
+    await expect(page.locator("#stationStats")).toContainText("Трасса М1");
+    await page.click("[data-tab=costs]");
+    await expect(page.locator("#costList")).toContainText("Страховка");
+    await page.click("[data-tab=rem]");
+    await expect(page.locator("#remList .rowline")).toHaveCount(2);
+    expect(await stored(page, "ev-tracker")).toBeNull();           // настоящие данные не тронуты
+
+    await page.reload();
+    await expect(page.locator("#demoBanner")).toBeVisible();
+    await expect(page.locator("#carName")).toContainText("пример");
+
+    // в примере можно пробовать, но при выходе всё стирается
+    await page.click("#btnAdd");
+    await page.fill("#formSess [name=station]", "Проба");
+    await page.fill("#formSess [name=kwh]", "10");
+    await page.fill("#formSess [name=byn]", "5");
+    await page.click("#btnSaveSess");
+    await page.click("#btnDemoExit");
+    await expect(page.locator("#welcome")).toBeVisible();
+    await expect(page.locator("#demoBanner")).toBeHidden();
+    await expect(page.locator("#fKwh")).toHaveText("0,0");
+    expect(await stored(page, "ev-tracker-demo")).toBeNull();
+    expect(await stored(page, "ev-tracker")).toBeNull();
+  });
+
+  test("свои записи остаются на месте, а копии в примере недоступны", async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnAdd"); // зарядка без настройки машины — приветствие ещё показывается
+    await page.fill("#formSess [name=station]", "Своя станция");
+    await page.fill("#formSess [name=kwh]", "20");
+    await page.fill("#formSess [name=byn]", "13");
+    await page.click("#btnSaveSess");
+    const mine = await stored(page, "ev-tracker");
+    await page.click("#btnDemo");
+    await expect(page.locator("#demoBanner")).toBeVisible();
+    await page.click("#btnJson");
+    await expect(page.locator("#toast")).toContainText("выйдите из примера");
+    await page.click("#btnImport");
+    await expect(page.locator("#toast")).toContainText("выйдите из примера");
+    await expect(page.locator("#bakBanner")).toBeHidden();
+    await page.click("#btnDemoExit");
+    await expect(page.locator("#fKwh")).toHaveText("20,0");
+    expect(await stored(page, "ev-tracker")).toBe(mine);
+  });
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
