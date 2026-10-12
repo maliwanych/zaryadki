@@ -175,6 +175,9 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .welcome .btn{flex:1 1 140px}
 .ver{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
 .imp{margin:0 0 10px;font-size:15px}
+.ver a{color:inherit}
+.welcome p a{color:var(--ac)}
+.banner.ios{align-items:flex-start}
 .imp.warn{color:var(--red);font-weight:500}
 </style>
 </head>
@@ -182,11 +185,12 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <main>
   <div class="banner" id="updBanner" hidden><span>Доступна новая версия</span><button class="link-btn" id="btnUpdate">Обновить</button></div>
   <div class="banner" id="undoBanner" hidden><span>Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
+  <div class="banner ios" id="iosHint" hidden><span id="iosText"></span><button class="link-btn" id="btnIosHint">Понятно</button></div>
   <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
   <h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1>
   <div class="welcome" id="welcome" hidden>
     <h2>Учёт зарядок</h2>
-    <p>Записывайте зарядки, пробег и расходы на машину — трекер посчитает стоимость километра, расход и экономию. Все данные хранятся только на этом телефоне, никуда не отправляются.</p>
+    <p>Записывайте зарядки, пробег и расходы на машину — трекер посчитает стоимость километра, расход и экономию. Все данные хранятся только на этом телефоне, никуда не отправляются. <a href="privacy.html">Подробнее</a></p>
     <div class="row">
       <button class="btn primary" id="btnStart">Настроить машину</button>
       <button class="btn" id="btnImport1">Загрузить копию</button>
@@ -276,7 +280,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <button class="link-btn" id="btnImport">Загрузить копию</button>
     <button class="link-btn" id="btnSettings">Настройки</button>
   </div>
-  <p class="ver tabbed" data-tab="overview">Версия <span id="appVer"></span> · данные хранятся только на этом устройстве</p>
+  <p class="ver tabbed" data-tab="overview">Версия <span id="appVer"></span> · данные хранятся только на этом устройстве · <a href="privacy.html">Конфиденциальность</a></p>
   <input type="file" id="fileImport" accept="application/json,.json" hidden>
 </main>
 
@@ -443,7 +447,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.2";
+const APP_VERSION = "1.0.3";
 const DB_KEY = "ev-tracker";
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
@@ -576,6 +580,7 @@ function render(){
   document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
   $("welcome").hidden = S.configured;
   backupNag();
+  iosHint();
 
   // the first frame animates from zero; later renders may land before it, so it reads the latest total
   lastTotal = st.totByn;
@@ -1156,6 +1161,21 @@ function cleanRecord(r,numFields){
   return d;
 }
 const validTs = ts => typeof ts==="string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ts) && !isNaN(new Date(ts));
+
+/* ---------- iPhone: Safari and the home-screen icon keep separate storage ---------- */
+const IOS_HINT_KEY=DB_KEY+"-ios-hint";
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const isStandalone=()=>navigator.standalone===true || matchMedia("(display-mode: standalone)").matches;
+function iosHint(){
+  const el=$("iosHint"); let off=false;
+  try{ off=localStorage.getItem(IOS_HINT_KEY)==="1"; }catch(e){}
+  el.hidden = !isIOS || isStandalone() || off;
+  if(el.hidden) return;
+  const has=S.sessions.length||S.costs.length||S.reminders.length||S.odoLog.length;
+  $("iosText").textContent="Установите приложение: кнопка «Поделиться» → На экран «Домой», и открывайте его с иконки. У Safari и у иконки разные хранилища: записи, внесённые здесь, в приложении с иконки не появятся."
+    +(has?" Здесь уже есть записи — сохраните резервную копию и загрузите её в приложении с иконки.":"");
+}
+$("btnIosHint").addEventListener("click",()=>{ try{ localStorage.setItem(IOS_HINT_KEY,"1"); }catch(e){} $("iosHint").hidden=true; });
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){

@@ -314,6 +314,68 @@ test("напоминания: «сегодня», конец месяца и м�
   expect(r).toMatchObject({ lastDate: "2027-01-31", dueDate: "2027-02-28" });
 });
 
+test("страница конфиденциальности: ссылка с главного экрана, возврат и работа без интернета", async ({ page, context }) => {
+  await page.goto("./");
+  await expect(page.locator("#welcome a[href='privacy.html']")).toBeVisible();
+  await page.click("footer a[href='privacy.html'], .ver a[href='privacy.html']");
+  await expect(page).toHaveURL(/privacy\.html$/);
+  await expect(page.locator("h1")).toHaveText("Конфиденциальность");
+  await expect(page.locator("body")).toContainText("хранятся только на вашем устройстве");
+  await page.click("a.back");
+  await expect(page.locator("#carName")).toBeVisible();
+
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload(); // страницей управляет service worker
+  await context.setOffline(true);
+  await page.goto("./privacy.html");
+  await expect(page.locator("h1")).toHaveText("Конфиденциальность");
+  await context.setOffline(false);
+});
+
+test("страница конфиденциальности ничего не загружает с чужих сайтов", () => {
+  // ссылки для чтения (<a href>) можно, а вот скрипты, стили, шрифты и картинки — только свои
+  const html = fs.readFileSync(path.join(__dirname, "..", "app", "privacy.html"), "utf8");
+  const external = [...html.matchAll(/<(script|link|img|iframe|style)[^>]*>/g)].map(m => m[0]).filter(t => /https?:|\/\//.test(t));
+  expect(external).toEqual([]);
+});
+
+test.describe("подсказка для iPhone", () => {
+  const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  test.use({ userAgent: IPHONE });
+
+  test("в Safari: как установить, «Понятно» запоминается", async ({ page }) => {
+    await page.goto("./");
+    const hint = page.locator("#iosHint");
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText("На экран «Домой»");
+    await expect(hint).toContainText("разные хранилища");
+    await page.click("#btnIosHint");
+    await expect(hint).toBeHidden();
+    await page.reload();
+    await expect(page.locator("#carName")).toBeVisible();
+    await expect(hint).toBeHidden();
+  });
+
+  test("в Safari с данными: советует перенести их копией", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await expect(page.locator("#iosHint")).toContainText("сохраните резервную копию");
+  });
+
+  test("в приложении с иконки подсказки нет", async ({ page }) => {
+    await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { get: () => true }));
+    await page.goto("./");
+    await expect(page.locator("#carName")).toBeVisible();
+    await expect(page.locator("#iosHint")).toBeHidden();
+  });
+});
+
+test("на Android подсказки для iPhone нет", async ({ page }) => {
+  await page.goto("./");
+  await expect(page.locator("#carName")).toBeVisible();
+  await expect(page.locator("#iosHint")).toBeHidden();
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
