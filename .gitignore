@@ -1,0 +1,10 @@
+node_modules/
+test-results/
+playwright-report/
+.DS_Store
+Thumbs.db
+
+# Личные данные никогда не попадают в репозиторий (он публичный)
+*backup*.json
+!tests/fixtures/sample-backup.json
+*.csv

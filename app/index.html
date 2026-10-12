@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Учёт зарядок</title>
+<meta name="description" content="Учёт зарядок и расходов на электромобиль. Данные хранятся только на вашем телефоне.">
+<meta name="theme-color" content="#E4E8EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12161B" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --plate:#E4E8EC; --panel:#F4F6F8; --ink:#18202B; --muted:#5B6673; --line:#CBD2D9;
+  --drum:#161A20; --drum-ink:#F2F4F6; --red:#C21F2B; --ac:#3F6FA8; --dc:#18202B; --hwy:#C21F2B;
+  --field:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --plate:#12161B; --panel:#1B2027; --ink:#E7EBEF; --muted:#8D98A5; --line:#2C343E;
+    --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
+    --field:#232932;
+  }
+}
+:root[data-theme="dark"]{
+  --plate:#12161B; --panel:#1B2027; --ink:#E7EBEF; --muted:#8D98A5; --line:#2C343E;
+  --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
+  --field:#232932;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--plate);color:var(--ink);font-family:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45;font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent}
+main{max-width:560px;margin:0 auto;padding:20px 16px 120px}
+h1{font-size:15px;font-weight:600;margin:0 0 14px;color:var(--muted);letter-spacing:.01em}
+h2{font-size:17px;font-weight:600;margin:0 0 10px}
+.muted{color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* Register (meter counter) */
+.register-wrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 16px 16px}
+.reg-label{font-size:14px;color:var(--muted);margin-bottom:8px}
+.register{display:flex;gap:3px;align-items:stretch;--h:52px;font-size:38px;font-weight:600}
+.register.small{--h:34px;font-size:23px;gap:2px}
+.drum{width:calc(var(--h)*.66);height:var(--h);overflow:hidden;background:var(--drum);color:var(--drum-ink);border-radius:4px;position:relative;box-shadow:inset 0 6px 8px -6px rgba(0,0,0,.8),inset 0 -6px 8px -6px rgba(0,0,0,.8)}
+.drum.dec{background:var(--red);color:#fff}
+.strip{display:flex;flex-direction:column;transition:transform 1.1s cubic-bezier(.2,.8,.2,1)}
+.strip span{height:var(--h);display:flex;align-items:center;justify-content:center;line-height:1}
+.reg-sep{width:6px;display:flex;align-items:flex-end;justify-content:center;font-size:28px;line-height:1;padding-bottom:4px;color:var(--muted)}
+.register.small .reg-sep{font-size:20px;padding-bottom:2px}
+.reg-unit{align-self:flex-end;font-size:15px;font-weight:500;color:var(--muted);margin-left:8px;padding-bottom:4px}
+.reg-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 0}
+.reg2{margin-top:14px}
+@media (prefers-reduced-motion:reduce){.strip{transition:none}}
+
+/* Figures */
+.figs{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px}
+.fig{background:var(--panel);padding:12px 14px}
+.fig b{display:block;font-size:22px;font-weight:600;line-height:1.2}
+.fig small{font-size:13px;color:var(--muted);display:block;margin-top:2px}
+.note{font-size:13px;color:var(--muted);margin:8px 2px 0}
+
+section{margin-top:28px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+
+.odo-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.odo-row b{font-size:20px;font-weight:600}
+.link-btn{background:none;border:0;color:var(--ac);font-weight:500;padding:6px 0}
+
+/* Types */
+.types{display:grid;gap:10px}
+.trow{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center}
+.dot{width:12px;height:12px;border-radius:3px}
+.t-ac{background:var(--ac)} .t-dc{background:var(--dc)} .t-hwy{background:var(--hwy)}
+.trow .price{font-weight:600}
+.bar{height:6px;border-radius:3px;background:var(--line);grid-column:2/4;overflow:hidden;margin-top:-4px}
+.bar i{display:block;height:100%}
+
+/* Chart */
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:10px;font-family:inherit}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+/* Sessions */
+.day{margin-top:16px}
+.day h3{font-size:14px;font-weight:600;color:var(--muted);margin:0 0 6px}
+.sess{width:100%;text-align:left;display:grid;grid-template-columns:4px 1fr auto;gap:0 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px 10px 0;margin-bottom:6px;overflow:hidden}
+.sess .stripe{grid-row:1/3;border-radius:0 3px 3px 0}
+.sess .st{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess .sum{font-weight:600;text-align:right}
+.sess .meta{font-size:13px;color:var(--muted)}
+.sess .meta.r{text-align:right}
+.sess.glitch{opacity:.6}
+
+.actions-bottom{display:flex;gap:16px;justify-content:center;margin-top:24px;flex-wrap:wrap}
+
+.fab{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--plate) 70%,transparent);display:flex;justify-content:center;z-index:5}
+.fab button{width:100%;max-width:528px;background:var(--ink);color:var(--plate);border:0;border-radius:12px;padding:15px;font-weight:600;font-size:17px}
+
+/* Sheets */
+dialog{border:0;padding:0;background:var(--panel);color:var(--ink);width:100%;max-width:560px;margin:auto auto 0;border-radius:18px 18px 0 0;max-height:92vh}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.sheet{padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;max-height:92vh}
+.sheet h2{margin-bottom:14px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fgrid .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--field);border:0;padding:10px 4px;font-size:15px;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg.four{grid-template-columns:repeat(4,1fr)}
+.seg.four button{font-size:13px;padding:10px 2px}
+.note p{margin:0 0 4px}
+.t-free{background:#3E9B6A}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--plate);font-weight:600}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.sheet-actions{display:flex;gap:10px;margin-top:18px}
+.btn{flex:1;border-radius:10px;padding:13px;font-weight:600;border:1px solid var(--line);background:var(--field)}
+.btn.primary{background:var(--ink);color:var(--plate);border-color:var(--ink)}
+.btn.danger{color:var(--red);flex:0 0 auto;padding:13px 16px}
+.btn:disabled{opacity:.5}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--plate);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.on{opacity:1}
+.regsub{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.regsub small{display:block;font-size:13px;color:var(--muted)}
+.regsub b{display:block;font-size:20px;font-weight:600;line-height:1.25}
+.regsub span{display:block;font-size:12px;color:var(--muted)}
+.ref{width:100%;display:flex;justify-content:space-between;gap:10px;background:none;border:0;padding:6px 0;font-size:14px;color:var(--muted);text-align:left}
+.ref span:last-child{color:var(--ink);font-weight:500;white-space:nowrap}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;display:grid;grid-template-columns:repeat(4,1fr);background:var(--plate);border-bottom:1px solid var(--line);margin:0 -16px 18px;padding:0 16px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:12px 2px;font-size:14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+[hidden]{display:none!important}
+.more{width:100%;background:none;border:1px dashed var(--line);border-radius:10px;padding:10px;color:var(--muted);font-size:14px;margin-top:4px}
+.rowline{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;background:none;border:0;padding:8px 0;text-align:left;border-top:1px solid var(--line)}
+.rowline:first-of-type{border-top:0}
+.rowline .l{min-width:0}
+.rowline .l b{font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rowline .l small{font-size:12px;color:var(--muted)}
+.rowline .r{text-align:right;white-space:nowrap}
+.rowline .r b{font-weight:600;display:block}
+.rowline .r small{font-size:12px;color:var(--muted)}
+.rowline.warn .r b{color:var(--red)}
+.cardhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:10px}
+.cardhead .sum{font-size:19px;font-weight:600}
+.month{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.month h3{margin:0 0 12px;font-size:17px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.month h3 small{font-size:13px;font-weight:400;color:var(--muted)}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.mgrid b{display:block;font-size:19px;font-weight:600;line-height:1.25}
+.mgrid small{font-size:12px;color:var(--muted);display:block}
+.delta{font-size:12px;font-weight:500;margin-left:4px}
+.delta.good{color:var(--ac)} .delta.bad{color:var(--red)}
+.mix{margin-top:14px}
+.mixbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}
+.mixbar i{display:block;height:100%}
+.mixleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:6px}
+.mixleg span{display:inline-flex;align-items:center;gap:5px}
+.t-night{background:#7A5BB5}
+.mnote{font-size:12px;color:var(--muted);margin:10px 0 0}
+.banner{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.banner.warn{border-color:var(--red)}
+.welcome{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 16px;margin-bottom:14px}
+.welcome h2{font-size:20px;margin:0 0 8px}
+.welcome p{margin:0 0 12px;color:var(--muted);font-size:14px}
+.welcome .row{display:flex;gap:10px;flex-wrap:wrap}
+.welcome .btn{flex:1 1 140px}
+.ver{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+  <div class="banner" id="updBanner" hidden><span>Доступна новая версия</span><button class="link-btn" id="btnUpdate">Обновить</button></div>
+  <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
+  <h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1>
+  <div class="welcome" id="welcome" hidden>
+    <h2>Учёт зарядок</h2>
+    <p>Записывайте зарядки, пробег и расходы на машину — трекер посчитает стоимость километра, расход и экономию. Все данные хранятся только на этом телефоне, никуда не отправляются.</p>
+    <div class="row">
+      <button class="btn primary" id="btnStart">Настроить машину</button>
+      <button class="btn" id="btnImport1">Загрузить копию</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Обзор</button>
+    <button role="tab" data-tab="sessions" aria-selected="false">Зарядки</button>
+    <button role="tab" data-tab="costs" aria-selected="false">Расходы</button>
+    <button role="tab" data-tab="rem" aria-selected="false">Напоминания</button>
+  </nav>
+
+  <div class="tabbed" data-tab="overview"><div class="register-wrap">
+    <div class="reg-label">Потрачено на зарядки</div>
+    <div class="reg-row"><div class="register" id="regByn"></div><div class="reg-unit">BYN</div></div>
+    <div class="regsub">
+      <div><small id="monthLbl">В этом месяце</small><b id="monthByn">—</b><span id="monthSub"></span></div>
+      <div><small>С прочими расходами</small><b id="ownByn">—</b><span>без разовых вложений</span></div>
+    </div>
+  </div>
+
+  <div class="figs">
+    <div class="fig"><b id="fPer100">—</b><small>BYN на 100 км</small></div>
+    <div class="fig"><b id="fCons">—</b><small>кВт·ч на 100 км</small></div>
+    <div class="fig"><b id="fPrice">—</b><small>BYN за кВт·ч в среднем</small></div>
+    <div class="fig"><b id="fKm">—</b><small>км проехано</small></div>
+    <div class="fig"><b id="fKwh">—</b><small>кВт·ч залито</small></div>
+    <div class="fig"><b id="fSaved">—</b><small id="fSavedL">сэкономлено на бесплатных зарядках</small></div>
+  </div>
+  <div class="note" id="perNote"></div></div>
+
+  <section data-tab="overview">
+    <div class="card">
+      <div class="odo-row">
+        <div><div class="muted" style="font-size:13px">Пробег и запас хода</div><b id="odoNow">—</b></div>
+        <button class="link-btn" id="btnOdo">Обновить</button>
+      </div>
+      <p class="mnote" id="odoStale"></p>
+    </div>
+  </section>
+
+  <section data-tab="overview">
+    <h2>Цена кВт·ч по типу зарядки</h2>
+    <div class="card types" id="types"></div>
+  </section>
+
+  <section data-tab="overview">
+    <h2>По месяцам</h2>
+    <div id="months"></div>
+  </section>
+
+  <section data-tab="sessions">
+    <h2>Станции</h2>
+    <div class="card" id="stationStats"></div>
+  </section>
+
+  <section data-tab="costs">
+    <h2>Прочие расходы</h2>
+    <div class="card">
+      <div class="cardhead"><span class="sum" id="costTotal">—</span><button class="link-btn" id="btnCost">Добавить расход</button></div>
+      <div id="costList"></div>
+      <p class="mnote" id="ownNote"></p>
+    </div>
+  </section>
+
+  <section data-tab="rem">
+    <h2>Напоминания</h2>
+    <div class="card">
+      <div class="cardhead"><span class="muted" style="font-size:13px">По пробегу и датам</span><button class="link-btn" id="btnRem">Добавить</button></div>
+      <div id="remList"></div>
+    </div>
+  </section>
+
+  <section id="f2fSec" data-tab="overview" hidden>
+    <h2>Точный расход</h2>
+    <div class="card" id="f2f"></div>
+  </section>
+
+  <section data-tab="sessions">
+    <h2>Все зарядки</h2>
+    <div id="list"><p class="muted">Загружаю данные…</p></div>
+  </section>
+
+  <div class="actions-bottom tabbed" data-tab="overview">
+    <button class="link-btn" id="btnCsv" hidden>Зарядки в CSV</button>
+    <button class="link-btn" id="btnJson" hidden>Резервная копия</button>
+    <button class="link-btn" id="btnImport">Загрузить копию</button>
+    <button class="link-btn" id="btnSettings">Настройки</button>
+  </div>
+  <p class="ver tabbed" data-tab="overview">Версия <span id="appVer"></span> · данные хранятся только на этом устройстве</p>
+  <input type="file" id="fileImport" accept="application/json,.json" hidden>
+</main>
+
+<div class="fab"><button id="btnAdd" disabled>Добавить зарядку</button></div>
+<div class="toast" id="toast"></div>
+
+<dialog id="dlgSess"><form class="sheet" id="formSess" method="dialog">
+  <h2 id="sessTitle">Новая зарядка</h2>
+  <div class="fgrid">
+    <label class="full">Дата и время<input type="datetime-local" name="ts" required></label>
+    <label class="full">Станция<input name="station" list="stations" placeholder="Название или адрес станции" autocomplete="off"></label>
+    <p class="hint full" id="priceHint" hidden></p>
+    <label>Заряжено, кВт·ч<input name="kwh" inputmode="decimal" required placeholder="0,00"></label>
+    <label>Сумма, BYN<input name="byn" inputmode="decimal" required placeholder="0,00"></label>
+    <div class="full"><label style="margin-bottom:4px">Тип</label>
+      <div class="seg" id="typeSeg">
+        <button type="button" data-t="ac">AC</button><button type="button" data-t="dc">DC город</button><button type="button" data-t="hwy">Трасса</button>
+      </div>
+    </div>
+    <label class="full">Пробег по одометру, км<input name="odo" inputmode="numeric" placeholder="Посмотрите на панели"></label>
+    <label class="full">Батарея после, %<input name="socTo" inputmode="numeric" placeholder="100 — если зарядили полностью"></label>
+    <label class="full">Приняла машина, кВт·ч (необязательно)<input name="kwhBat" inputmode="decimal" placeholder="С экрана авто, если показывает"></label>
+    <p class="hint full">Пробег и проценты необязательны, но с ними считается точный расход. Заряжаетесь до 100% — расход между такими зарядками будет без оценок.</p>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" class="btn danger" id="btnDel" hidden>Удалить</button>
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary" id="btnSaveSess">Сохранить</button>
+  </div>
+</form></dialog>
+
+<dialog id="dlgOdo"><form class="sheet" id="formOdo" method="dialog">
+  <h2>Пробег сейчас</h2>
+  <div class="fgrid">
+    <label>Одометр, км<input name="odo" inputmode="numeric" required></label>
+    <label>Запас хода, км<input name="range" inputmode="numeric" placeholder="С панели"></label>
+    <p class="hint full">Запас хода нужен, чтобы учесть энергию, которая уже оплачена, но ещё лежит в батарее. Обновляйте в последний день месяца — тогда месячный расход будет точным.</p>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary">Сохранить</button>
+  </div>
+</form></dialog>
+
+<dialog id="dlgSet"><form class="sheet" id="formSet" method="dialog">
+  <h2>Настройки</h2>
+  <div class="fgrid">
+    <label class="full">Машина<input name="carName" placeholder="Например, Geely EX5" autocomplete="off"></label>
+    <label>Дата покупки<input type="date" name="purchaseDate" required></label>
+    <label>Пробег при покупке, км<input name="startOdo" inputmode="numeric" required></label>
+    <label>Запас хода при покупке, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
+    <label class="full">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
+    <label class="full">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик, например 60,2"></label>
+    <p class="hint full">Пробег при покупке нужен, чтобы не считать чужие километры. Если не знаете, с каким запасом отдали машину, оставьте пустым — стоимость километра покажется диапазоном. Ёмкость нужна для расчёта реального запаса хода.</p>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary">Сохранить</button>
+  </div>
+</form></dialog>
+
+<dialog id="dlgRef"><form class="sheet" id="formRef" method="dialog">
+  <h2 id="refTitle">Возврат за поездку</h2>
+  <div class="fgrid">
+    <label>Сумма, BYN<input name="byn" inputmode="decimal" required></label>
+    <label>Дата<input type="date" name="date"></label>
+    <label class="full">За что<input name="note" placeholder="Например, поездка в Брест"></label>
+    <p class="hint full">Деньги, которые вам докинули на дорогу. Уменьшают личные траты, но не меняют стоимость километра для машины.</p>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" class="btn danger" id="btnRefDel" hidden>Удалить</button>
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary">Сохранить</button>
+  </div>
+</form></dialog>
+
+<dialog id="dlgCost"><form class="sheet" id="formCost" method="dialog">
+  <h2 id="costTitle">Расход на машину</h2>
+  <div class="fgrid">
+    <label>Сумма, BYN<input name="byn" inputmode="decimal" required></label>
+    <label>Дата<input type="date" name="date" required></label>
+    <label class="full">Что это<input name="note" list="costNotes" placeholder="Страховка, шины, ТО, мойка"></label>
+    <div class="full"><label style="margin-bottom:4px">Тип расхода</label>
+      <div class="seg four" id="costSeg">
+        <button type="button" data-k="run">Текущий</button><button type="button" data-k="period">За период</button><button type="button" data-k="km">На пробег</button><button type="button" data-k="invest">Вложение</button>
+      </div>
+    </div>
+    <label class="full" id="kmWrap" hidden>Ресурс, км<input name="lifeKm" inputmode="numeric" placeholder="50000"></label>
+    <label class="full" id="periodWrap" hidden>Платёж покрывает
+      <select name="periodMonths">
+        <option value="1">1 месяц</option><option value="3">квартал</option>
+        <option value="6">полгода</option><option value="12" selected>год</option>
+      </select>
+    </label>
+    <label class="full">Пробег, км (необязательно)<input name="odo" inputmode="numeric"></label>
+    <p class="hint full">Текущий — мойка, шиномонтаж. За период — страховка: раскладывается по месяцам. На пробег — шины, колодки: раскладывается по километрам от пробега покупки. Вложение — антикор, ковры, аксессуары: в общую сумму входит, в стоимость километра нет.</p>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" class="btn danger" id="btnCostDel" hidden>Удалить</button>
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary">Сохранить</button>
+  </div>
+</form></dialog>
+
+<dialog id="dlgRem"><form class="sheet" id="formRem" method="dialog">
+  <h2 id="remTitle">Напоминание</h2>
+  <div class="fgrid">
+    <label class="full">Что сделать<input name="title" required placeholder="Перестановка шин"></label>
+    <label>Каждые, км<input name="everyKm" inputmode="numeric" placeholder="10000"></label>
+    <label>Пробег, когда делали<input name="lastOdo" inputmode="numeric"></label>
+    <label>Или к дате<input type="date" name="dueDate"></label>
+    <label>Повтор, месяцев<input name="everyMonths" inputmode="numeric" placeholder="12"></label>
+    <p class="hint full">Можно задать интервал по пробегу, дату или и то и другое. Трекер покажет, что ближе.</p>
+  </div>
+  <button type="button" class="btn" id="btnRemDone" hidden style="width:100%;margin-top:14px">Выполнено сегодня</button>
+  <div class="sheet-actions">
+    <button type="button" class="btn danger" id="btnRemDel" hidden>Удалить</button>
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary">Сохранить</button>
+  </div>
+</form></dialog>
+
+<datalist id="costNotes">
+  <option value="Страховка"></option><option value="Шины"></option><option value="ТО"></option>
+  <option value="Мойка"></option><option value="Шиномонтаж"></option><option value="Парковка"></option>
+</datalist>
+<datalist id="stations"></datalist>
+
+<script>
+(function(){
+const TYPES = {ac:{name:"AC, медленная",cls:"t-ac",var:"--ac"}, dc:{name:"DC в городе",cls:"t-dc",var:"--dc"}, hwy:{name:"DC на трассе",cls:"t-hwy",var:"--hwy"}};
+const S = {sessions:[], settings:{purchaseDate:new Date().toISOString().slice(0,10), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], loaded:{s:false,set:false,cur:false}};
+let lastTotal = 0, db = null, downloads = null, editingId = null, editingRef = null, editingCost = null, editingRem = null, bynTouched = false, curType = "dc", firstPaint = true;
+
+const $ = id => document.getElementById(id);
+const num = v => { if (v===null||v===undefined) return null; const s=String(v).replace(/\s/g,"").replace(",","."); if(s==="") return null; const n=parseFloat(s); return isFinite(n)?n:null; };
+const fmt = (n,d=2) => n.toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtInt = n => Math.round(n).toLocaleString("ru-RU");
+const pad = n => String(n).padStart(2,"0");
+const nowLocal = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const cssv = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const glitch = s => (s.kwh||0) < 1;
+const isFree = s => !glitch(s) && (s.byn||0)===0;
+const plural = (n,a,b,c) => { const m10=n%10, m100=n%100; return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20))?b:c; };
+const dShort = t => t.toLocaleDateString("ru-RU",{day:"numeric",month:"short"});
+let RD = [];   // odometer readings, rebuilt on every render
+// a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
+const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
+
+const APP_VERSION = "1.0.0";
+
+/* ---------- local storage with the same small API the tracker already uses ---------- */
+function LocalDB(key){
+  const load=()=>{ try{ const o=JSON.parse(localStorage.getItem(key)||"null"); return (o&&o.docs)||{}; }catch(e){ return {}; } };
+  let docs=load();
+  const subs=new Set();
+  const save=()=>localStorage.setItem(key, JSON.stringify({schema:1, docs}));   // throws on quota → caller shows a toast
+  const notify=()=>subs.forEach(f=>f());
+  const snap=p=>{ const d=docs[p]; return {id:p.split("/").pop(), exists:d!==undefined, data:()=>d}; };
+  const depth=p=>p.split("/").length;
+  const colDocs=c=>Object.keys(docs).filter(k=>k.startsWith(c+"/")&&depth(k)===depth(c)+1).sort().map(snap);
+  const sub=f=>{ subs.add(f); setTimeout(f,0); return ()=>subs.delete(f); };
+  const doc=p=>({ id:p.split("/").pop(), path:p,
+    get:async()=>snap(p),
+    set:async d=>{ const prev=docs[p]; docs[p]=JSON.parse(JSON.stringify(d)); try{ save(); }catch(e){ if(prev===undefined) delete docs[p]; else docs[p]=prev; throw e; } notify(); },
+    delete:async()=>{ const prev=docs[p]; delete docs[p]; try{ save(); }catch(e){ docs[p]=prev; throw e; } notify(); },
+    onSnapshot:(n)=>sub(()=>n(snap(p))) });
+  const collection=c=>({ path:c, doc:id=>doc(`${c}/${id||LocalDB.newId()}`), onSnapshot:(n)=>sub(()=>{ const d=colDocs(c); n({docs:d,size:d.length,empty:!d.length}); }) });
+  // another tab or window changed the data
+  window.addEventListener("storage",e=>{ if(e.key===key){ docs=load(); notify(); } });
+  return { doc, collection, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
+}
+LocalDB.newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+/* ---------- saving files: share sheet on phones (to Telegram, Drive…), download otherwise ---------- */
+async function saveFile({filename,data}){
+  const type = filename.endsWith(".json") ? "application/json" : "text/csv";
+  const file = new File([data], filename, {type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:filename}); return {status:"saved"}; }
+    catch(e){ if(e && e.name==="AbortError") throw {code:"declined"}; }
+  }
+  const url=URL.createObjectURL(file); const a=document.createElement("a");
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+  return {status:"saved"};
+}
+
+/* ---------- offline + updates ---------- */
+function registerSW(){
+  if(!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("sw.js").then(reg=>{
+    const offer=w=>{ $("updBanner").hidden=false; $("btnUpdate").onclick=()=>{ wantReload=true; w.postMessage("skipWaiting"); }; };
+    if(reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+    reg.addEventListener("updatefound",()=>{ const w=reg.installing; w.addEventListener("statechange",()=>{ if(w.state==="installed" && navigator.serviceWorker.controller) offer(w); }); });
+    // look for a new version whenever the app comes back to the foreground
+    document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") reg.update().catch(()=>{}); });
+  }).catch(()=>{});
+  // Reload only when the user pressed «Обновить». On the very first visit the worker also takes control
+  // (clients.claim) — reloading then would wipe a form or an import the user is in the middle of.
+  let wantReload=false, reloaded=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(!wantReload || reloaded) return; reloaded=true; location.reload(); });
+}
+
+function toast(t){ const el=$("toast"); el.textContent=t; el.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove("on"),2200); }
+
+/* ---------- register (meter drums) ---------- */
+function buildRegister(el, intDigits){
+  el.innerHTML = "";
+  const make = dec => { const d=document.createElement("div"); d.className="drum"+(dec?" dec":""); const s=document.createElement("div"); s.className="strip"; for(let i=0;i<10;i++){const sp=document.createElement("span");sp.textContent=i;s.appendChild(sp);} d.appendChild(s); el.appendChild(d); return s; };
+  const strips=[]; for(let i=0;i<intDigits;i++) strips.push(make(false));
+  const sep=document.createElement("div"); sep.className="reg-sep"; sep.textContent=","; el.appendChild(sep);
+  strips.push(make(true)); strips.push(make(true));
+  el._strips = strips; el._digits = intDigits;
+  el.setAttribute("role","img");
+}
+function setRegister(el, value){
+  const v = Math.max(0, Math.min(value, Math.pow(10,el._digits)-0.01));
+  const [i,d] = v.toFixed(2).split(".");
+  const chars = (i.padStart(el._digits,"0")+d).split("");
+  const h = el._strips[0].firstChild.getBoundingClientRect().height || 40;
+  chars.forEach((c,k)=>{ el._strips[k].style.transform = `translateY(-${Number(c)*h}px)`; });
+  el.setAttribute("aria-label", fmt(value));
+}
+buildRegister($("regByn"),5);
+
+/* ---------- stats ---------- */
+function computeStats(){
+  RD = readings();
+  const ss = S.sessions.slice().sort((a,b)=>a.ts<b.ts?-1:1);
+  const totByn = ss.reduce((a,s)=>a+(s.byn||0),0);
+  const totKwh = ss.reduce((a,s)=>a+(s.kwh||0),0);
+  const real = ss.filter(s=>!glitch(s));
+  const rKwh = real.reduce((a,s)=>a+s.kwh,0), rByn = real.reduce((a,s)=>a+s.byn,0);
+  const paidS = real.filter(s=>!isFree(s));
+  const paidKwh = paidS.reduce((a,s)=>a+s.kwh,0), paidByn = paidS.reduce((a,s)=>a+s.byn,0);
+  const paidAvg = paidKwh ? paidByn/paidKwh : null;
+  const freeKwh = real.filter(isFree).reduce((a,s)=>a+s.kwh,0);
+  const saved = paidAvg ? freeKwh*paidAvg : 0;
+  const startOdo = S.settings.startOdo||0;
+  const purchaseT = new Date(S.settings.purchaseDate+"T00:00");
+  const odoNow = RD.reduce((m,x)=>Math.max(m,x.odo||0),0);
+  const km = odoNow - startOdo;
+  // latest reading with a known range (not the purchase itself) is the anchor for cost per km
+  const RR = RD.filter(x=>x.range!=null && x.t>purchaseT);
+  const Rr = RR.length ? RR[RR.length-1] : null;
+  const base = Rr ? ss.filter(s=>inBefore(s,Rr)) : ss;
+  const pending = Rr ? ss.filter(s=>!inBefore(s,Rr) && !glitch(s)) : [];
+  const pKwh = base.reduce((a,s)=>a+(s.kwh||0),0), pByn = base.reduce((a,s)=>a+(s.byn||0),0);
+  const kmR = Rr ? Rr.odo - startOdo : km;
+  const paidMax = kmR + (Rr ? Rr.range : 0);                 // car came empty
+  const paidMin = (Rr && S.settings.startRange!=null) ? paidMax - S.settings.startRange : null;
+  const paid = paidMin!=null ? paidMin : paidMax;
+  const byType = {};
+  for(const t in TYPES) byType[t]={kwh:0,byn:0,n:0};
+  const free = {kwh:0,n:0};
+  real.forEach(s=>{ if(isFree(s)){ free.kwh+=s.kwh; free.n++; return; } const b=byType[s.type]||byType.dc; b.kwh+=s.kwh; b.byn+=s.byn; b.n++; });
+  // full-to-full
+  const anchors = ss.map((s,i)=>({s,i})).filter(o=>o.s.odo!=null && o.s.socTo!=null && o.s.socTo>=99);
+  let fKwh=0,fByn=0,fKm=0,fN=0; const rng=[];
+  for(let k=1;k<anchors.length;k++){
+    const a=anchors[k-1], b=anchors[k]; const dist=b.s.odo-a.s.odo; if(dist<=0) continue;
+    let bat=0, allBat=true;
+    for(let j=a.i+1;j<=b.i;j++){ fKwh+=ss[j].kwh||0; fByn+=ss[j].byn||0;
+      if(glitch(ss[j])) continue; if(ss[j].kwhBat) bat+=ss[j].kwhBat; else allBat=false; }
+    fKm+=dist; fN++;
+    // real range on a full battery: needs the car's own kWh for every charge in the interval
+    if(allBat && bat>0) rng.push({km:dist, bat, date:b.s.ts});
+  }
+  return {ss,totByn,totKwh,rKwh,rByn,paidAvg,freeKwh,saved,odoNow,km,Rr,pending,pKwh,pByn,kmR,paidMax,paidMin,paid,byType,free,f:{kwh:fKwh,byn:fByn,km:fKm,n:fN,rng}};
+}
+
+/* ---------- render ---------- */
+function render(){
+  const st = computeStats();
+  const pd = new Date(S.settings.purchaseDate+"T00:00");
+  $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"});
+  $("carName").textContent = S.settings.carName || "Мой электромобиль";
+  document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
+  $("welcome").hidden = S.configured;
+  backupNag();
+
+  // the first frame animates from zero; later renders may land before it, so it reads the latest total
+  lastTotal = st.totByn;
+  if(firstPaint){ firstPaint=false; requestAnimationFrame(()=>requestAnimationFrame(()=>setRegister($("regByn"),lastTotal))); }
+  else setRegister($("regByn"),st.totByn);
+
+  $("fPrice").textContent = st.rKwh>0 ? fmt(st.rByn/st.rKwh) : "—";
+  $("fKm").textContent = st.km>0 ? fmtInt(st.km) : "—";
+  $("fKwh").textContent = fmt(st.totKwh,1);
+  $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} BYN` : "—";
+  $("fSavedL").textContent = st.freeKwh>0 ? `сэкономлено на бесплатных ${fmt(st.freeKwh,0)} кВт·ч` : "сэкономлено на бесплатных зарядках";
+  const notes = [];
+  if(st.kmR>0){
+    const hi = st.paidMin!=null ? st.paidMin : st.kmR;     // unknown start range: from "came full-ish" …
+    const lo = st.paid;                                     // … to "came empty"
+    const perHi = st.pByn/hi*100, perLo = st.pByn/lo*100, cHi = st.pKwh/hi*100, cLo = st.pKwh/lo*100;
+    const same = Math.abs(perHi-perLo)<0.05;
+    $("fPer100").textContent = same ? fmt(perLo,1) : `${fmt(perLo,1)}–${fmt(perHi,1)}`;
+    $("fCons").textContent = same ? fmt(cLo,1) : `${fmt(cLo,0)}–${fmt(cHi,0)}`;
+    if(st.Rr) notes.push(`Цена и расход — на ${dShort(st.Rr.t)}: ${fmtInt(st.kmR)} км пройдено плюс ${fmtInt(st.Rr.range)} км запаса в батарее${S.settings.startRange!=null?` минус ${fmtInt(S.settings.startRange)} км, с которыми отдали машину`:""}. Расход по счётчикам станций, с потерями на зарядку.`);
+    else notes.push("Запас хода ещё не указан — расход посчитан только по пройденным километрам и завышен.");
+    if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
+  } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
+  if(st.paidAvg!=null && st.freeKwh>0) notes.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} BYN/кВт·ч — по этой цене считается экономия.`);
+  // under the meter: this month's charging and the running cost of the car
+  const now=new Date(), mKey=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  const mS=S.sessions.filter(x=>x.ts.slice(0,7)===mKey && !glitch(x));
+  $("monthLbl").textContent = "В " + now.toLocaleDateString("ru-RU",{month:"long"}).replace(/ь$/,"е").replace(/й$/,"е").replace(/т$/,"те");
+  $("monthByn").textContent = `${fmt(mS.reduce((a,x)=>a+(x.byn||0),0))} BYN`;
+  $("monthSub").textContent = `${mS.length} ${plural(mS.length,"зарядка","зарядки","зарядок")}, ${fmt(mS.reduce((a,x)=>a+x.kwh,0),0)} кВт·ч`;
+  $("ownByn").textContent = `${fmt(st.totByn + S.costs.reduce((a,c)=>a+accrued(c,now),0))} BYN`;
+  const withBat=S.sessions.filter(x=>x.kwhBat&&x.kwh);
+  if(withBat.length){
+    const w=withBat.reduce((a,x)=>a+x.kwh,0), b=withBat.reduce((a,x)=>a+x.kwhBat,0);
+    notes.push(`Потери при зарядке по замерам (${withBat.length} ${plural(withBat.length,"зарядка","зарядки","зарядок")}) — ${fmt((w/b-1)*100,1)}%.`);
+  }
+  if(S.settings.carCons && st.paid>0) notes.push(`Бортовой компьютер показывал ${fmt(S.settings.carCons,1)} кВт·ч/100 км — это расход без потерь на зарядку.`);
+  const pn=$("perNote"); pn.innerHTML=""; notes.forEach(t=>{ const e=document.createElement("p"); e.textContent=t; pn.appendChild(e); });
+
+  const Rr=st.Rr;
+  $("odoNow").textContent = st.odoNow>0 ? `${fmtInt(st.odoNow)} км${Rr?`, запас ${fmtInt(Rr.range)} км${Rr.odo<st.odoNow?` (на ${fmtInt(Rr.odo)} км)`:""}`:""}` : "не указан";
+  const stale=$("odoStale");
+  const lastT = RD.length>1 ? RD[RD.length-1].t : null;
+  const days = lastT ? Math.floor((Date.now()-lastT)/864e5) : null;
+  stale.textContent = days!=null && days>=14 ? `Пробег не обновлялся ${days} дн. — от него зависят расход и напоминания.` : "";
+
+  // types
+  const tEl = $("types"); tEl.innerHTML="";
+  const maxP = Math.max(...Object.values(st.byType).map(b=>b.kwh?b.byn/b.kwh:0),0.01);
+  for(const t in TYPES){ const b=st.byType[t]; if(!b.n) continue;
+    const p=b.byn/b.kwh; const row=document.createElement("div"); row.className="trow";
+    row.innerHTML = `<span class="dot ${TYPES[t].cls}"></span><span>${TYPES[t].name} <span class="muted" style="font-size:13px">· ${b.n} шт., ${fmt(b.byn)} BYN</span></span><span class="price">${fmt(p)}</span><div class="bar"><i class="${TYPES[t].cls}" style="width:${(p/maxP*100).toFixed(1)}%"></i></div>`;
+    tEl.appendChild(row); }
+  if(st.free.n){ const row=document.createElement("div"); row.className="trow";
+    row.innerHTML=`<span class="dot t-free"></span><span>Бесплатно <span class="muted" style="font-size:13px">· ${st.free.n} шт., ${fmt(st.free.kwh,1)} кВт·ч</span></span><span class="price">0,00</span>`;
+    tEl.appendChild(row); }
+  if(!tEl.children.length) tEl.innerHTML='<span class="muted">Пока нет зарядок</span>';
+
+  renderMonths(st);
+  renderStations();
+  renderCosts(st);
+  renderReminders(st);
+
+  // full-to-full
+  if(st.f.n>0){ $("f2fSec").dataset.empty="0"; $("f2fSec").hidden = tab!=="overview";
+    const cap = S.settings.capKwh, R=st.f.rng;
+    let rangeHtml = `<p class="mnote">Реальный запас на полном заряде появится, когда в полных зарядках будет заполнено «Приняла машина, кВт·ч».</p>`;
+    if(R.length && !cap) rangeHtml = `<p class="mnote">Укажите в настройках полезную ёмкость батареи — появится реальный запас хода на полном заряде.</p>`;
+    if(R.length && cap){
+      const last=R[R.length-1], lastR=cap*last.km/last.bat;
+      const allKm=R.reduce((a,x)=>a+x.km,0), allBat=R.reduce((a,x)=>a+x.bat,0), avgR=cap*allKm/allBat;
+      rangeHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><b style="font-size:20px">≈${fmtInt(lastR)} км</b><div class="muted" style="font-size:13px">реальный запас на полном заряде — по последнему интервалу (${fmtInt(last.km)} км, машина приняла ${fmt(last.bat,1)} кВт·ч, ${fmt(last.bat/last.km*100,1)} кВт·ч/100 км без потерь на зарядку)${R.length>1?`. В среднем по ${R.length} интервалам — ≈${fmtInt(avgR)} км`:""}. Считается от полезной ёмкости ${fmt(cap,1)} кВт·ч.</div></div>`;
+    }
+    $("f2f").innerHTML = `<div class="odo-row"><div><b>${fmt(st.f.kwh/st.f.km*100,1)} кВт·ч</b> <span class="muted">и</span> <b>${fmt(st.f.byn/st.f.km*100,1)} BYN</b><div class="muted" style="font-size:13px">на 100 км, по ${st.f.n} ${plural(st.f.n,"интервалу","интервалам","интервалам")} от полного до полного, ${fmtInt(st.f.km)} км</div></div></div>` + rangeHtml;
+  } else { $("f2fSec").dataset.empty="1"; $("f2fSec").hidden=true; }
+
+  renderList(st.ss);
+
+  const dl=$("stations"); dl.innerHTML="";
+  [...new Set(S.sessions.map(s=>s.station).filter(Boolean))].sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o);});
+}
+
+
+let listLimit=12;
+function renderList(ss){
+  const el=$("list"); el.innerHTML="";
+  if(!ss.length){ el.innerHTML='<p class="muted">Зарядок пока нет. Нажмите «Добавить зарядку», когда будете у станции.</p>'; return; }
+  const all=ss.slice().reverse(); const shown=all.slice(0,listLimit);
+  const groups={}; shown.forEach(s=>{ const k=s.ts.slice(0,10); (groups[k]=groups[k]||[]).push(s); });
+  Object.keys(groups).forEach(k=>{
+    const g=document.createElement("div"); g.className="day";
+    const d=new Date(k+"T00:00");
+    const sum=groups[k].reduce((a,s)=>a+(s.byn||0),0);
+    g.innerHTML=`<h3>${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",weekday:"short"})} · ${fmt(sum)} BYN</h3>`;
+    groups[k].forEach(s=>{
+      const b=document.createElement("button"); b.type="button"; b.className="sess"+(glitch(s)?" glitch":"");
+      const t=TYPES[s.type]||TYPES.dc; const p = s.kwh? s.byn/s.kwh : 0;
+      const bits=[s.ts.slice(11,16), glitch(s)?"сбой старта":isFree(s)?"бесплатно, "+t.name.split(",")[0]:t.name];
+      if(s.socFrom!=null&&s.socTo!=null) bits.push(`${s.socFrom}→${s.socTo}%`); else if(s.socTo!=null) bits.push(`до ${s.socTo}%`);
+      if(s.odo!=null) bits.push(`${fmtInt(s.odo)} км`);
+      if(s.kwhBat&&s.kwh) bits.push(`потери ${fmt((s.kwh/s.kwhBat-1)*100,0)}%`);
+      b.innerHTML=`<span class="stripe ${t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} BYN</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
+      b.querySelector(".st").textContent = s.station || "Без названия";
+      b.querySelectorAll(".meta")[0].textContent = bits.join(" · ");
+      b.addEventListener("click",()=>openSess(s));
+      g.appendChild(b);
+    });
+    el.appendChild(g);
+  });
+  if(all.length>shown.length){
+    const b=document.createElement("button"); b.type="button"; b.className="more";
+    b.textContent=`Показать ещё ${all.length-shown.length}`;
+    b.addEventListener("click",()=>{ listLimit+=24; render(); }); el.appendChild(b);
+  } else if(listLimit>12){
+    const b=document.createElement("button"); b.type="button"; b.className="more";
+    b.textContent="Свернуть список"; b.addEventListener("click",()=>{ listLimit=12; render(); }); el.appendChild(b);
+  }
+}
+
+/* ---------- stations ---------- */
+function stationPrice(name){
+  const ss=S.sessions.filter(s=>s.station===name && !glitch(s)).sort((a,b)=>a.ts<b.ts?1:-1);
+  return ss.length ? ss[0].byn/ss[0].kwh : null;
+}
+function renderStations(){
+  const el=$("stationStats"); const map={};
+  S.sessions.filter(s=>!glitch(s)).forEach(s=>{ const k=s.station||"Без названия";
+    (map[k]=map[k]||{kwh:0,byn:0,n:0,last:""}); map[k].kwh+=s.kwh; map[k].byn+=s.byn; map[k].n++;
+    if(s.ts>map[k].last) map[k].last=s.ts; });
+  const rows=Object.entries(map).map(([k,v])=>({name:k,...v,price:v.byn/v.kwh})).sort((a,b)=>a.price-b.price);
+  if(!rows.length){ el.innerHTML='<span class="muted">Появится после первой зарядки</span>'; return; }
+  el.innerHTML="";
+  rows.forEach(r=>{
+    const d=document.createElement("div"); d.className="rowline";
+    d.innerHTML=`<span class="l"><b></b><small>${r.n} ${plural(r.n,"зарядка","зарядки","зарядок")} · ${fmt(r.kwh,1)} кВт·ч · ${fmt(r.byn)} BYN</small></span>
+      <span class="r"><b>${fmt(r.price)}</b><small>BYN/кВт·ч</small></span>`;
+    d.querySelector("b").textContent=r.name; el.appendChild(d);
+  });
+  const cheap=rows[0], dear=rows[rows.length-1];
+  if(rows.length>1){ const p=document.createElement("p"); p.className="mnote";
+    p.textContent=`Дешевле всего выходит ${cheap.name} (${fmt(cheap.price)}), дороже всего ${dear.name} (${fmt(dear.price)}).`;
+    el.appendChild(p); }
+}
+
+/* ---------- costs ---------- */
+const KIND={run:"текущий", period:"за период", km:"на пробег", invest:"вложение"};
+const costStartOdo = c => c.odo!=null ? c.odo : odoAt(RD, new Date((c.date||S.settings.purchaseDate)+"T12:00"));
+// how much of a cost has actually accrued by date `to`
+function accrued(c,to){
+  if(c.kind==="invest") return 0;
+  const b=c.byn||0;
+  if(c.kind==="km" && c.lifeKm){
+    if(c.date && to<new Date(c.date+"T00:00")) return 0;
+    return b*Math.max(0,Math.min(1,(odoAt(RD,to)-costStartOdo(c))/c.lifeKm));
+  }
+  if(c.kind!=="period"||!c.periodMonths) return (!c.date||new Date(c.date+"T12:00")<=to)?b:0;
+  const start=new Date(c.date+"T12:00"); if(to<start) return 0;
+  const months=(to.getFullYear()-start.getFullYear())*12+(to.getMonth()-start.getMonth())+(to.getDate()>=start.getDate()?1:0);
+  return b*Math.max(0,Math.min(1,months/c.periodMonths));
+}
+// portion of a cost that falls inside [from,to)
+function costInRange(c,from,to){
+  const a=accrued(c,from), b=accrued(c,to);
+  return Math.max(0,b-a);
+}
+function renderCosts(st){
+  const tot=S.costs.reduce((a,c)=>a+(c.byn||0),0);
+  const invest=S.costs.filter(c=>c.kind==="invest").reduce((a,c)=>a+(c.byn||0),0);
+  const acc=S.costs.reduce((a,c)=>a+accrued(c,new Date()),0);
+  $("costTotal").textContent=`${fmt(tot)} BYN`;
+  const el=$("costList"); el.innerHTML="";
+  S.costs.slice().sort((a,b)=>(a.date||"")<(b.date||"")?1:-1).forEach(c=>{
+    const b=document.createElement("button"); b.type="button"; b.className="rowline";
+    const bits=[];
+    if(c.date) bits.push(new Date(c.date+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"}));
+    bits.push(c.kind==="period" ? `за ${c.periodMonths||12} мес.` : c.kind==="km"&&c.lifeKm ? `на ${fmtInt(c.lifeKm)} км` : KIND[c.kind||"run"]);
+    if(c.odo!=null) bits.push(`${fmtInt(c.odo)} км`);
+    b.innerHTML=`<span class="l"><b></b><small>${bits.join(" · ")}</small></span><span class="r"><b>${fmt(c.byn||0)} BYN</b>${c.kind==="period"||c.kind==="km"?`<small>${fmt(accrued(c,new Date()))} уже прошло</small>`:""}</span>`;
+    b.querySelector("b").textContent=c.note||"Расход";
+    b.addEventListener("click",()=>openCost(c)); el.appendChild(b);
+  });
+  if(!S.costs.length) el.innerHTML='<span class="muted">Страховка, шины, ТО, мойки — всё, кроме зарядок</span>';
+  const note=$("ownNote");
+  if(tot>0 && st.km>0){
+    const chargePer100=st.paid>0?st.pByn/st.paid*100:0, costPer100=acc/st.km*100;
+    note.textContent=`Разовые вложения — ${fmt(invest)} BYN, в стоимость километра не входят. Текущих расходов накоплено ${fmt(acc)} BYN. Владение обходится в ${fmt(chargePer100+costPer100,1)} BYN на 100 км: ${fmt(chargePer100,1)} зарядки плюс ${fmt(costPer100,1)} прочее.`;
+  } else note.textContent="";
+}
+
+/* ---------- reminders ---------- */
+function curOdo(){ return readings().reduce((m,x)=>Math.max(m,x.odo||0),0); }
+function renderReminders(){
+  const el=$("remList"); el.innerHTML=""; const odo=curOdo(); const today=new Date();
+  if(!S.reminders.length){ el.innerHTML='<span class="muted">Например, перестановка шин каждые 10 000 км</span>'; return; }
+  const rows=S.reminders.map(r=>{
+    let kmLeft=null, daysLeft=null;
+    if(r.everyKm) kmLeft=(r.lastOdo||0)+r.everyKm-odo;
+    if(r.dueDate) daysLeft=Math.round((new Date(r.dueDate+"T12:00")-today)/864e5);
+    return {r,kmLeft,daysLeft};
+  }).sort((a,b)=>{
+    const ka=a.kmLeft??1e9, kb=b.kmLeft??1e9, da=a.daysLeft??1e9, db=b.daysLeft??1e9;
+    return Math.min(ka/50,da)-Math.min(kb/50,db);
+  });
+  rows.forEach(({r,kmLeft,daysLeft})=>{
+    const b=document.createElement("button"); b.type="button"; b.className="rowline";
+    const parts=[];
+    if(kmLeft!=null) parts.push(kmLeft>0?`через ${fmtInt(kmLeft)} км`:`просрочено на ${fmtInt(-kmLeft)} км`);
+    if(daysLeft!=null) parts.push(daysLeft>0?`через ${daysLeft} дн.`:`срок прошёл`);
+    const warn=(kmLeft!=null&&kmLeft<500)||(daysLeft!=null&&daysLeft<7);
+    if(warn) b.classList.add("warn");
+    const sub=[]; if(r.everyKm) sub.push(`каждые ${fmtInt(r.everyKm)} км`);
+    if(r.everyMonths) sub.push(`каждые ${r.everyMonths} мес.`);
+    if(r.everyKm && r.lastOdo) sub.push(`делали на ${fmtInt(r.lastOdo)} км`);
+    b.innerHTML=`<span class="l"><b></b><small>${sub.join(" · ")}</small></span><span class="r"><b>${parts[0]||"—"}</b>${parts[1]?`<small>${parts[1]}</small>`:""}</span>`;
+    b.querySelector("b").textContent=r.title;
+    b.addEventListener("click",()=>openRem(r)); el.appendChild(b);
+  });
+}
+
+/* ---------- monthly ---------- */
+const MIX = {hwy:{n:"Трасса",c:"t-hwy"}, dc:{n:"DC днём",c:"t-dc"}, night:{n:"Ночью",c:"t-night"}, ac:{n:"AC днём",c:"t-ac"}, free:{n:"Бесплатно",c:"t-free"}};
+const isNight = ts => { const h=parseInt(ts.slice(11,13),10); return h>=21 || h<8; };
+const mixCat = s => isFree(s) ? "free" : s.type==="hwy" ? "hwy" : isNight(s.ts) ? "night" : s.type==="ac" ? "ac" : "dc";
+function readings(){
+  const r=[{t:new Date(S.settings.purchaseDate+"T00:00"), odo:S.settings.startOdo||0, range:S.settings.startRange??null}];
+  S.odoLog.forEach(x=>{ if(x.odo!=null&&x.date) r.push({t:new Date(x.date),odo:x.odo,range:x.range??null}); });
+  S.sessions.forEach(x=>{ if(x.odo!=null) r.push({t:new Date(x.ts),odo:x.odo,range:null}); });
+  if(S.current&&S.current.odo!=null&&S.current.date) r.push({t:new Date(S.current.date),odo:S.current.odo,range:S.current.range??null});
+  return r.sort((a,b)=>a.t-b.t);
+}
+function odoAt(r,t){
+  if(t<=r[0].t) return r[0].odo; const L=r[r.length-1]; if(t>=L.t) return L.odo;
+  for(let i=0;i<r.length-1;i++){ const a=r[i],b=r[i+1]; if(t>=a.t&&t<b.t){ const k=(t-a.t)/(b.t-a.t||1); return a.odo+(b.odo-a.odo)*k; } }
+  return L.odo;
+}
+function monthStats(paidAvg){
+  const r=RD; const purchase=new Date(S.settings.purchaseDate+"T00:00"); const now=new Date();
+  const out=[]; let y=purchase.getFullYear(), m=purchase.getMonth();
+  while(new Date(y,m,1)<=now){
+    const start=new Date(y,m,1), end=new Date(y,m+1,1), from=start<purchase?purchase:start, to=end>now?now:end;
+    const ss=S.sessions.filter(s=>{const t=new Date(s.ts);return t>=start&&t<end;});
+    const real=ss.filter(s=>!glitch(s));
+    const byn=ss.reduce((a,s)=>a+(s.byn||0),0), kwh=ss.reduce((a,s)=>a+(s.kwh||0),0);
+    const rk=real.reduce((a,s)=>a+s.kwh,0), rb=real.reduce((a,s)=>a+s.byn,0);
+    const ref=S.refunds.filter(x=>{ if(!x.date) return y===purchase.getFullYear()&&m===purchase.getMonth(); const t=new Date(x.date+"T12:00"); return t>=start&&t<end; }).reduce((a,x)=>a+(x.byn||0),0);
+    const km=Math.max(0,odoAt(r,to)-odoAt(r,from));
+    // consumption: between first and last readings with known range inside the month
+    const wr=r.filter(x=>x.range!=null&&x.t>=from&&x.t<=to);
+    let cons=null, per100=null, exact=false;
+    if(wr.length>=2){ const A=wr[0],B=wr[wr.length-1]; const paid=(B.odo-A.odo)+(B.range-A.range);
+      if(B.t>A.t&&paid>0){ const inn=S.sessions.filter(s=>inBefore(s,B)&&!inBefore(s,A));
+        cons=inn.reduce((a,s)=>a+(s.kwh||0),0)/paid*100; per100=inn.reduce((a,s)=>a+(s.byn||0),0)/paid*100; exact=true; } }
+    if(cons===null&&km>50){ cons=kwh/km*100; per100=byn/km*100; }
+    const mix={hwy:0,dc:0,night:0,ac:0,free:0}; real.forEach(s=>mix[mixCat(s)]+=s.kwh);
+    const saved=paidAvg?mix.free*paidAvg:0;
+    const partial=end>now;
+    const costs=S.costs.reduce((a,c)=>a+costInRange(c,start,to),0);
+    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,partial,costs,saved});
+    m++; if(m>11){m=0;y++;}
+  }
+  return out;
+}
+function delta(cur,prev,lowerIsGood,d=1){
+  if(cur==null||prev==null||!prev) return ""; const diff=cur-prev; if(Math.abs(diff)<Math.pow(10,-d)) return "";
+  const good = lowerIsGood ? diff<0 : diff>0;
+  return `<span class="delta ${good?"good":"bad"}">${diff>0?"▲":"▼"}${fmt(Math.abs(diff),d)}</span>`;
+}
+function renderMonths(st){
+  const el=$("months"); const ms=monthStats(st.paidAvg);
+  if(!ms.length){ el.innerHTML=""; return; }
+  el.innerHTML="";
+  ms.slice().reverse().forEach((M,i,arr)=>{
+    const P=arr[i+1]||null;
+    const name=new Date(M.y,M.m,1).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+    const d=document.createElement("div"); d.className="month";
+    const mixTot=Object.values(M.mix).reduce((a,b)=>a+b,0);
+    const cheap=mixTot?(M.mix.night+M.mix.ac+M.mix.free)/mixTot*100:0;
+    let bar="", leg="";
+    for(const k of ["hwy","dc","night","ac","free"]){ if(!M.mix[k]) continue; const pc=M.mix[k]/mixTot*100;
+      bar+=`<i class="${MIX[k].c}" style="width:${pc.toFixed(1)}%"></i>`;
+      leg+=`<span><i class="dot ${MIX[k].c}"></i>${MIX[k].n} ${fmt(pc,0)}%</span>`; }
+    const notes=[];
+    if(M.cons!=null && !M.exact) notes.push("Расход приблизительный: в начале или конце месяца не указан запас хода.");
+    d.innerHTML=`<h3><span>${name[0].toUpperCase()+name.slice(1)}</span><small>${M.partial?"идёт":""}</small></h3>
+      <div class="mgrid">
+        <div><b>${fmtInt(M.km)} км</b><small>проехано</small></div>
+        <div><b>${fmt(M.byn)} BYN</b><small>на зарядки</small></div>
+        <div><b>${M.cons!=null?(M.exact?"":"≈")+fmt(M.cons,1):"—"}${delta(M.cons,P&&P.cons,true)}</b><small>кВт·ч на 100 км</small></div>
+        <div><b>${M.per100!=null?(M.exact?"":"≈")+fmt(M.per100,1):"—"}${delta(M.per100,P&&P.per100,true)}</b><small>BYN на 100 км</small></div>
+        <div><b>${M.price!=null?fmt(M.price):"—"}${delta(M.price,P&&P.price,true,2)}</b><small>BYN за кВт·ч</small></div>
+        <div><b>${fmt(M.costs)} BYN</b><small>прочие расходы</small></div>
+        <div><b>${fmt(M.kwh,1)}</b><small>кВт·ч, ${M.n} ${plural(M.n,"зарядка","зарядки","зарядок")}</small></div>
+        <div><b>${M.saved?`≈${fmt(M.saved,0)} BYN`:"—"}</b><small>сэкономлено на бесплатных</small></div>
+      </div>
+      ${mixTot?`<div class="mix"><small class="muted" style="font-size:12px">Дешёвые и бесплатные (ночь, AC, бесплатно): ${fmt(cheap,0)}%</small><div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
+      ${notes.length?`<p class="mnote">${notes.join(" ")}</p>`:""}`;
+    el.appendChild(d);
+  });
+}
+
+/* ---------- sheets ---------- */
+document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>b.closest("dialog").close()));
+document.querySelectorAll("dialog").forEach(d=>d.addEventListener("click",e=>{ if(e.target===d) d.close(); }));
+function setType(t){ curType=t; $("typeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===t)); }
+$("typeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setType(b.dataset.t); });
+
+function openSess(s){
+  const f=$("formSess"); f.reset(); editingId = s?s.id:null;
+  $("sessTitle").textContent = s?"Зарядка":"Новая зарядка"; $("btnDel").hidden=!s; disarm($("btnDel"));
+  f.ts.value = s? s.ts.slice(0,16) : nowLocal();
+  f.station.value = s?.station||""; f.kwh.value = s? String(s.kwh).replace(".",","):"";
+  f.byn.value = s? String(s.byn).replace(".",","):""; f.odo.value = s?.odo??"";
+  f.socTo.value = s?.socTo??""; f.kwhBat.value = s?.kwhBat??"";
+  setType(s?.type || lastType());
+  bynTouched = !!s; applyPriceHint();
+  $("dlgSess").showModal();
+}
+function lastType(){ const ss=S.sessions.slice().sort((a,b)=>a.ts<b.ts?1:-1); return ss[0]?.type||"dc"; }
+let tab="overview";
+const FAB={overview:["Добавить зарядку",()=>openSess(null)], sessions:["Добавить зарядку",()=>openSess(null)],
+           costs:["Добавить расход",()=>openCost(null)], rem:["Добавить напоминание",()=>openRem(null)]};
+function setTab(t){
+  tab=t;
+  $("tabs").querySelectorAll("button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
+  document.querySelectorAll("section[data-tab],.tabbed[data-tab]").forEach(el=>{
+    const on = el.dataset.tab===t;
+    if(el.id==="f2fSec"){ el.hidden = !on || el.dataset.empty==="1"; }
+    else el.hidden = !on;
+  });
+  $("btnAdd").textContent=FAB[t][0];
+  window.scrollTo({top:0});
+}
+$("tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-tab]"); if(b) setTab(b.dataset.tab); });
+$("btnAdd").addEventListener("click",()=>FAB[tab][1]());
+
+$("formSess").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return;
+  const f=e.target; const kwh=num(f.kwh.value), byn=num(f.byn.value);
+  if(kwh===null||kwh<0){ toast("Укажите, сколько кВт·ч заряжено"); f.kwh.focus(); return; }
+  if(byn===null||byn<0){ toast("Укажите сумму в BYN"); f.byn.focus(); return; }
+  const doc = { ts:f.ts.value, station:f.station.value.trim(), kwh, byn, type:curType,
+    odo:num(f.odo.value), socTo:num(f.socTo.value), kwhBat:num(f.kwhBat.value) };
+  const btn=$("btnSaveSess"); btn.disabled=true;
+  try{
+    const ref = editingId ? db.collection("sessions").doc(editingId) : db.collection("sessions").doc();
+    await ref.set(doc);
+    $("dlgSess").close(); toast(editingId?"Изменения сохранены":"Зарядка сохранена");
+  }catch(err){ toast(err&&err.code==="quota_exceeded"?"Хранилище заполнено":"Не сохранилось"+(err&&err.code?` (${err.code})`:"")+". Повторите"); }
+  finally{ btn.disabled=false; }
+});
+function armDelete(btn, action){
+  btn.addEventListener("click", async()=>{
+    if(btn.dataset.armed!=="1"){
+      btn.dataset.armed="1"; btn.textContent="Точно удалить?";
+      clearTimeout(btn._t); btn._t=setTimeout(()=>disarm(btn),4000); return;
+    }
+    disarm(btn); btn.disabled=true;
+    try{ await action(); }
+    catch(e){ toast("Не удалилось"+(e&&e.code?` (${e.code})`:"")+". Повторите"); }
+    finally{ btn.disabled=false; }
+  });
+}
+function disarm(btn){ btn.dataset.armed=""; btn.textContent="Удалить"; clearTimeout(btn._t); }
+armDelete($("btnDel"), async()=>{ if(!editingId||!db) return; await db.collection("sessions").doc(editingId).delete(); $("dlgSess").close(); toast("Зарядка удалена"); });
+
+$("btnOdo").addEventListener("click",()=>{ const f=$("formOdo"); f.odo.value=curOdo()||""; f.range.value=""; $("dlgOdo").showModal(); f.range.focus(); });
+$("formOdo").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return; const f=e.target; const odo=num(f.odo.value);
+  if(odo===null){ toast("Укажите пробег"); return; }
+  try{ const rec={odo, range:num(f.range.value), date:new Date().toISOString()};
+    await db.doc("meta/current").set(rec); await db.collection("odo").doc().set(rec);
+    $("dlgOdo").close(); toast("Пробег обновлён"); }
+  catch(err){ toast("Не сохранилось. Повторите"); }
+});
+
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; $("dlgSet").showModal(); }
+$("btnSettings").addEventListener("click",openSettings);
+$("btnStart").addEventListener("click",openSettings);
+$("formSet").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return; const f=e.target;
+  try{ await db.doc("meta/settings").set({carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
+  catch(err){ toast("Не сохранилось. Повторите"); }
+});
+
+function openRef(r){
+  const f=$("formRef"); f.reset(); editingRef=r?r.id:null; $("btnRefDel").hidden=!r; disarm($("btnRefDel"));
+  $("refTitle").textContent = r?"Возврат":"Возврат за поездку";
+  f.byn.value = r? String(r.byn).replace(".",","):""; f.date.value=r?.date||nowLocal().slice(0,10); f.note.value=r?.note||"";
+  $("dlgRef").showModal();
+}
+
+$("formRef").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return; const f=e.target; const byn=num(f.byn.value);
+  if(byn===null||byn<=0){ toast("Укажите сумму"); return; }
+  try{ const ref = editingRef? db.collection("refunds").doc(editingRef) : db.collection("refunds").doc();
+    await ref.set({byn, date:f.date.value||null, note:f.note.value.trim()}); $("dlgRef").close(); toast("Возврат сохранён"); }
+  catch(err){ toast("Не сохранилось. Повторите"); }
+});
+armDelete($("btnRefDel"), async()=>{ if(!editingRef||!db) return; await db.collection("refunds").doc(editingRef).delete(); $("dlgRef").close(); toast("Возврат удалён"); });
+
+let costKind="run";
+function setCostKind(k){ costKind=k;
+  $("costSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===k));
+  $("periodWrap").hidden = k!=="period";
+  $("kmWrap").hidden = k!=="km";
+}
+$("costSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setCostKind(b.dataset.k); });
+function openCost(c){
+  const f=$("formCost"); f.reset(); editingCost=c?c.id:null; $("btnCostDel").hidden=!c; disarm($("btnCostDel"));
+  f.byn.value=c?String(c.byn).replace(".",","):""; f.date.value=c?.date||nowLocal().slice(0,10);
+  f.note.value=c?.note||""; f.odo.value=c?.odo??(curOdo()||"");
+  setCostKind(c?.kind||"run"); f.periodMonths.value=String(c?.periodMonths||12); f.lifeKm.value=c?.lifeKm??"";
+  $("dlgCost").showModal();
+}
+$("btnCost").addEventListener("click",()=>openCost(null));
+$("formCost").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return; const f=e.target; const byn=num(f.byn.value);
+  if(byn===null||byn<=0){ toast("Укажите сумму"); return; }
+  try{ const ref=editingCost?db.collection("costs").doc(editingCost):db.collection("costs").doc();
+    await ref.set({byn, date:f.date.value, note:f.note.value.trim(), odo:num(f.odo.value),
+      kind:costKind, periodMonths:costKind==="period"?Number(f.periodMonths.value):null,
+      lifeKm:costKind==="km"?(num(f.lifeKm.value)||50000):null});
+    $("dlgCost").close(); toast("Расход сохранён"); }
+  catch(err){ toast("Не сохранилось. Повторите"); }
+});
+armDelete($("btnCostDel"), async()=>{ if(!editingCost||!db) return; await db.collection("costs").doc(editingCost).delete(); $("dlgCost").close(); toast("Расход удалён"); });
+
+function openRem(r){
+  const f=$("formRem"); f.reset(); editingRem=r?r.id:null; $("btnRemDel").hidden=!r; disarm($("btnRemDel"));
+  $("remTitle").textContent=r?"Напоминание":"Новое напоминание";
+  f.title.value=r?.title||""; f.everyKm.value=r?.everyKm??""; f.lastOdo.value=r?.lastOdo??(curOdo()||"");
+  f.dueDate.value=r?.dueDate||""; f.everyMonths.value=r?.everyMonths??"";
+  const o=curOdo();
+  $("btnRemDone").hidden=!r;
+  $("btnRemDone").textContent = o ? `Выполнено сегодня (пробег ${fmtInt(o)} км)` : "Выполнено сегодня";
+  $("dlgRem").showModal();
+}
+$("btnRem").addEventListener("click",()=>openRem(null));
+$("formRem").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return; const f=e.target;
+  if(!f.title.value.trim()){ toast("Назовите напоминание"); return; }
+  if(!num(f.everyKm.value) && !f.dueDate.value){ toast("Задайте интервал в км или дату"); return; }
+  try{ const ref=editingRem?db.collection("reminders").doc(editingRem):db.collection("reminders").doc();
+    await ref.set({title:f.title.value.trim(), everyKm:num(f.everyKm.value), lastOdo:num(f.lastOdo.value),
+      dueDate:f.dueDate.value||null, everyMonths:num(f.everyMonths.value)});
+    $("dlgRem").close(); toast("Напоминание сохранено"); }
+  catch(err){ toast("Не сохранилось. Повторите"); }
+});
+$("btnRemDone").addEventListener("click",async()=>{
+  if(!editingRem||!db) return; const r=S.reminders.find(x=>x.id===editingRem); if(!r) return;
+  const today=new Date(); const upd={...r}; delete upd.id;
+  upd.lastOdo=curOdo()||upd.lastOdo; upd.lastDate=today.toISOString().slice(0,10);
+  if(r.everyMonths){ const d=new Date(today); d.setMonth(d.getMonth()+r.everyMonths); upd.dueDate=d.toISOString().slice(0,10); }
+  else if(r.dueDate) upd.dueDate=null;
+  try{ await db.collection("reminders").doc(editingRem).set(upd); $("dlgRem").close(); toast("Отметил выполненным"); }
+  catch(e){ toast("Не сохранилось. Повторите"); }
+});
+armDelete($("btnRemDel"), async()=>{ if(!editingRem||!db) return; await db.collection("reminders").doc(editingRem).delete(); $("dlgRem").close(); toast("Напоминание удалено"); });
+
+/* ---------- quick entry ---------- */
+function applyPriceHint(){
+  const f=$("formSess"); const p=stationPrice(f.station.value.trim()); const h=$("priceHint");
+  if(p!=null){ h.hidden=false; h.textContent= p===0 ? "Здесь заряжаетесь бесплатно — сумма 0." : `Последняя цена здесь — ${fmt(p)} BYN/кВт·ч. Сумма посчитается сама.`; }
+  else { h.hidden=true; }
+  return p;
+}
+function autoSum(){
+  const f=$("formSess"); if(bynTouched) return;
+  const p=stationPrice(f.station.value.trim()), k=num(f.kwh.value);
+  if(p!=null&&k!==null&&k>0) f.byn.value=fmt(k*p);
+}
+$("formSess").station.addEventListener("input",()=>{ applyPriceHint(); autoSum(); });
+$("formSess").station.addEventListener("change",()=>{ applyPriceHint(); autoSum(); });
+$("formSess").kwh.addEventListener("input",autoSum);
+$("formSess").byn.addEventListener("input",()=>{ bynTouched=true; });
+
+/* ---------- CSV ---------- */
+$("btnCsv").addEventListener("click",async()=>{
+  if(!downloads) return;
+  const rows=[["Дата","Время","Станция","Тип","кВт·ч из сети","BYN","BYN/кВт·ч","Одометр","% после","кВт·ч в батарею"]];
+  S.sessions.slice().sort((a,b)=>a.ts<b.ts?-1:1).forEach(s=>rows.push([s.ts.slice(0,10),s.ts.slice(11,16),s.station||"",(TYPES[s.type]||TYPES.dc).name,fmt(s.kwh),fmt(s.byn),s.kwh?fmt(s.byn/s.kwh,3):"",s.odo??"",s.socTo??"",s.kwhBat!=null?fmt(s.kwhBat):""]));
+  const csv="\uFEFF"+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;}).join(";")).join("\r\n");
+  try{ await downloads.save({filename:`zaryadki-${new Date().toISOString().slice(0,10)}.csv`, data:csv}); toast("Файл сохранён"); }
+  catch(err){ if(err&&err.code!=="declined") toast("Не получилось сохранить файл"); }
+});
+
+$("btnJson").addEventListener("click",async()=>{
+  if(!downloads) return;
+  const strip = a => a.map(({id,...d})=>({id,...d}));
+  const data={exportedAt:new Date().toISOString(), settings:S.settings, current:S.current, sessions:strip(S.sessions), odo:strip(S.odoLog), refunds:strip(S.refunds), costs:strip(S.costs), reminders:strip(S.reminders)};
+  try{ await downloads.save({filename:`zaryadki-backup-${new Date().toISOString().slice(0,10)}.json`, data:JSON.stringify(data,null,2)});
+    await db.doc("meta/backup").set({date:new Date().toISOString()}); toast("Копия сохранена"); }
+  catch(err){ if(err&&err.code!=="declined") toast("Не получилось сохранить файл"); }
+});
+$("btnBak2").addEventListener("click",()=>$("btnJson").click());
+
+/* ---------- import from a backup (this app's or the Claude tracker's) ---------- */
+const openImport=()=>$("fileImport").click();
+$("btnImport").addEventListener("click",openImport);
+$("btnImport1").addEventListener("click",openImport);
+$("fileImport").addEventListener("change",async e=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  let data;
+  try{ data=JSON.parse(await file.text()); }catch(err){ toast("Это не файл резервной копии"); return; }
+  if(!data || !Array.isArray(data.sessions)){ toast("В файле нет зарядок — это не резервная копия трекера"); return; }
+  const hasData = S.sessions.length||S.costs.length||S.odoLog.length;
+  if(hasData && !confirmReplace()) { toast("Нажмите «Загрузить копию» ещё раз, чтобы заменить текущие данные"); return; }
+  const docs={};
+  const put=(c,arr)=>(arr||[]).forEach(({id,...d})=>{ docs[`${c}/${id||LocalDB.newId()}`]=d; });
+  put("sessions",data.sessions); put("odo",data.odo); put("refunds",data.refunds); put("costs",data.costs); put("reminders",data.reminders);
+  if(data.settings) docs["meta/settings"]=data.settings;
+  if(data.current) docs["meta/current"]=data.current;
+  docs["meta/backup"]={date:data.exportedAt||new Date().toISOString()};
+  try{ db.replaceAll(docs); toast(`Загружено: ${data.sessions.length} ${plural(data.sessions.length,"зарядка","зарядки","зарядок")}`); }
+  catch(err){ toast("Не получилось сохранить — не хватает места"); }
+});
+let replaceArmedAt=0;
+function confirmReplace(){ const now=Date.now(); if(now-replaceArmedAt<15000){ replaceArmedAt=0; return true; } replaceArmedAt=now; return false; }
+
+/* ---------- remind about backups: the data lives only on this phone ---------- */
+function backupNag(){
+  const n=S.sessions.length+S.costs.length; const el=$("bakBanner");
+  if(n<5){ el.hidden=true; return; }
+  const last=S.backup&&S.backup.date?new Date(S.backup.date):null;
+  const days=last?Math.floor((Date.now()-last)/864e5):null;
+  if(days!=null && days<30){ el.hidden=true; return; }
+  $("bakText").textContent = days==null ? "Данные есть только на этом телефоне. Сохраните резервную копию." : `Последняя копия — ${days} дн. назад.`;
+  el.hidden=false;
+}
+
+/* ---------- boot ---------- */
+setTab("overview");
+render();
+(()=>{
+  db = LocalDB("ev-tracker");
+  downloads = { save: saveFile };
+  $("btnAdd").disabled=false; $("btnCsv").hidden=false; $("btnJson").hidden=false;
+  $("appVer").textContent = APP_VERSION;
+  const onErr = ()=>{};
+  db.collection("sessions").onSnapshot(snap=>{ S.sessions=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
+  db.doc("meta/settings").onSnapshot(snap=>{ S.configured=snap.exists; S.settings={purchaseDate:new Date().toISOString().slice(0,10), startOdo:0, startRange:null, carName:"", ...(snap.exists?snap.data():{})}; render(); }, onErr);
+  db.doc("meta/backup").onSnapshot(snap=>{ S.backup=snap.exists?snap.data():null; render(); }, onErr);
+  db.collection("costs").onSnapshot(snap=>{ S.costs=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
+  db.collection("reminders").onSnapshot(snap=>{ S.reminders=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
+  db.collection("odo").onSnapshot(snap=>{ S.odoLog=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
+  db.collection("refunds").onSnapshot(snap=>{ S.refunds=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
+  db.doc("meta/current").onSnapshot(snap=>{ S.current=snap.exists?snap.data():null; render(); }, onErr);
+  // ask the browser not to evict our data under storage pressure
+  if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+  registerSW();
+})();
+})();
+</script>
+</body>
+</html>

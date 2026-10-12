@@ -1,0 +1,167 @@
+{
+ "exportedAt": "2026-08-25T10:00:00.000Z",
+ "settings": {
+  "carName": "Тестовый электромобиль",
+  "purchaseDate": "2026-08-01",
+  "startOdo": 10,
+  "startRange": 300,
+  "capKwh": 60,
+  "carCons": 15
+ },
+ "current": {
+  "odo": 1250,
+  "range": 400,
+  "date": "2026-08-24T12:30:00.000Z"
+ },
+ "sessions": [
+  {
+   "id": "t01",
+   "ts": "2026-08-03T18:40",
+   "station": "Станция А",
+   "kwh": 30.0,
+   "byn": 19.5,
+   "type": "dc",
+   "odo": null,
+   "socTo": null,
+   "kwhBat": null
+  },
+  {
+   "id": "t02",
+   "ts": "2026-08-09T10:15",
+   "station": "Трасса Б",
+   "kwh": 40.0,
+   "byn": 29.2,
+   "type": "hwy",
+   "odo": null,
+   "socTo": null,
+   "kwhBat": null
+  },
+  {
+   "id": "t03",
+   "ts": "2026-08-09T23:30",
+   "station": "Станция А",
+   "kwh": 35.0,
+   "byn": 17.15,
+   "type": "dc",
+   "odo": null,
+   "socTo": null,
+   "kwhBat": null
+  },
+  {
+   "id": "t04",
+   "ts": "2026-08-14T12:00",
+   "station": "Работа",
+   "kwh": 50.0,
+   "byn": 0,
+   "type": "ac",
+   "odo": 900,
+   "socTo": 100,
+   "kwhBat": 47.0
+  },
+  {
+   "id": "t05",
+   "ts": "2026-08-15T08:00",
+   "station": "Сбой",
+   "kwh": 0.3,
+   "byn": 0.2,
+   "type": "dc",
+   "odo": null,
+   "socTo": null,
+   "kwhBat": null
+  },
+  {
+   "id": "t06",
+   "ts": "2026-08-20T17:30",
+   "station": "Станция В",
+   "kwh": 20.0,
+   "byn": 10.8,
+   "type": "ac",
+   "odo": null,
+   "socTo": null,
+   "kwhBat": 18.8
+  },
+  {
+   "id": "t07",
+   "ts": "2026-08-24T15:00",
+   "station": "Работа",
+   "kwh": 40.0,
+   "byn": 0,
+   "type": "ac",
+   "odo": 1250,
+   "socTo": 100,
+   "kwhBat": 37.6
+  }
+ ],
+ "odo": [
+  {
+   "id": "o1",
+   "date": "2026-08-14T09:30:00.000Z",
+   "odo": 900,
+   "range": 400
+  },
+  {
+   "id": "o2",
+   "date": "2026-08-24T12:30:00.000Z",
+   "odo": 1250,
+   "range": 400
+  }
+ ],
+ "refunds": [],
+ "costs": [
+  {
+   "id": "c1",
+   "byn": 600,
+   "date": "2026-08-01",
+   "note": "КАСКО",
+   "odo": 10,
+   "kind": "period",
+   "periodMonths": 3
+  },
+  {
+   "id": "c2",
+   "byn": 20,
+   "date": "2026-08-10",
+   "note": "Мойка",
+   "odo": null,
+   "kind": "run",
+   "periodMonths": null
+  },
+  {
+   "id": "c3",
+   "byn": 1000,
+   "date": "2026-08-01",
+   "note": "Шины",
+   "odo": 10,
+   "kind": "km",
+   "periodMonths": null,
+   "lifeKm": 50000
+  },
+  {
+   "id": "c4",
+   "byn": 300,
+   "date": "2026-08-02",
+   "note": "Коврики",
+   "odo": null,
+   "kind": "invest",
+   "periodMonths": null
+  }
+ ],
+ "reminders": [
+  {
+   "id": "r1",
+   "title": "Перестановка шин",
+   "everyKm": 10000,
+   "lastOdo": 0,
+   "dueDate": null,
+   "everyMonths": null
+  },
+  {
+   "id": "r2",
+   "title": "Страховка",
+   "everyKm": null,
+   "lastOdo": null,
+   "dueDate": "2027-08-01",
+   "everyMonths": 12
+  }
+ ]
+}
