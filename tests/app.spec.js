@@ -426,6 +426,50 @@ test("на Android подсказки для iPhone нет", async ({ page }) =>
   await expect(page.locator("#iosHint")).toBeHidden();
 });
 
+test("валюта ₽: все подписи меняются, суммы те же, выбор сохраняется в копии", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page);
+  const total = await page.locator("#regByn").getAttribute("aria-label");
+  await page.click("#btnSettings");
+  await expect(page.locator("#formSet [name=currency]")).toHaveValue("BYN"); // старая копия без валюты — BYN
+  await page.selectOption("#formSet [name=currency]", "RUB");
+  await page.click("#formSet button[type=submit]");
+  await expect(page.locator(".reg-unit")).toHaveText("₽");
+  await expect(page.locator("#regByn")).toHaveAttribute("aria-label", total); // меняется только подпись
+  // нигде на экранах не осталось BYN
+  for (const tab of ["overview", "sessions", "costs", "rem"]) {
+    await page.click(`[data-tab=${tab}]`);
+    expect(await page.locator("main").innerText(), tab).not.toContain("BYN");
+  }
+  await page.click("[data-tab=overview]");
+  await expect(page.locator(".month").first()).toContainText("₽ на 100 км");
+  await page.click("#btnAdd");
+  await expect(page.locator("#dlgSess")).toContainText("Сумма, ₽");
+  await page.click("#dlgSess [data-close]");
+  await page.reload();
+  await expect(page.locator(".reg-unit")).toHaveText("₽");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#btnJson")]);
+  expect(JSON.parse(fs.readFileSync(await download.path(), "utf8")).settings.currency).toBe("RUB");
+});
+
+test("валюта: непонятное значение в копии — BYN", async ({ page }) => {
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0, currency: "USD" }, sessions: [{ id: "s1", ts: "2026-08-03T18:40", kwh: 30, byn: 19.5, type: "dc" }] });
+  await expect(page.locator("#fKwh")).toHaveText("30,0");
+  await expect(page.locator(".reg-unit")).toHaveText("BYN");
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs["meta/settings"]);
+  expect(stored.currency).toBeUndefined();
+});
+
+test("счётчик добавляет разряд после 99 999,99", async ({ page }) => {
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Проверка", purchaseDate: "2026-01-01", startOdo: 0, currency: "RUB" },
+    sessions: [{ id: "s1", ts: "2026-02-01T10:00", kwh: 5000, byn: 123456.78, type: "dc" }] });
+  await expect(page.locator("#fKwh")).toHaveText("5 000,0");
+  await expect(page.locator("#regByn .drum")).toHaveCount(8); // 6 целых + 2 копейки
+  await expect(page.locator("#regByn")).toHaveAttribute("aria-label", /^123\s456,78$/); // тысячи разделяет неразрывный пробел
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
