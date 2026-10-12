@@ -211,6 +211,109 @@ test("правка записи не стирает поля, которых н�
   expect(d["meta/settings"]).toMatchObject({ carName: "Другая", legacy: "x" });
 });
 
+const importJson = (page, data) =>
+  page.setInputFiles("#fileImport", { name: "copy.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
+
+test("цена км не уходит в минус сразу после покупки", async ({ page }) => {
+  // Отдали с запасом 300 км, проехали 10, запас 250: «оплачено» 10 + 250 − 300 = −40 км
+  await page.goto("./");
+  await importJson(page, {
+    settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0, startRange: 300 },
+    odo: [{ id: "o1", date: "2026-08-02T12:00:00.000Z", odo: 10, range: 250 }],
+    sessions: [{ id: "s1", ts: "2026-08-01T18:00", station: "А", kwh: 5, byn: 3, type: "dc" }],
+  });
+  await expect(page.locator("#fKwh")).toHaveText("5,0");
+  await expect(page.locator("#fPer100")).toHaveText("—");
+  await expect(page.locator("#fCons")).toHaveText("—");
+  await expect(page.locator("#perNote")).toContainText("Пока мало данных");
+});
+
+test("загрузка копии поверх данных: окно с цифрами, отмена и «Вернуть как было»", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page); // на пустом телефоне — без вопросов
+  await expect(page.locator("#dlgImport")).toBeHidden();
+  // запись, которой нет в копии
+  await page.click("#btnAdd");
+  await page.fill("#formSess [name=station]", "Новая станция");
+  await page.fill("#formSess [name=kwh]", "10");
+  await page.fill("#formSess [name=byn]", "6");
+  await page.click("#btnSaveSess");
+  await page.click("[data-tab=sessions]");
+  await expect(page.locator("#list")).toContainText("Новая станция");
+
+  const dlg = page.locator("#dlgImport");
+  await page.setInputFiles("#fileImport", FIXTURE);
+  await expect(dlg).toBeVisible();
+  await expect(dlg).toContainText("В копии от 25 августа 2026");
+  await expect(dlg).toContainText("7 зарядок, 4 расхода, 2 напоминания");
+  await expect(dlg).toContainText("Сейчас на телефоне: 8 зарядок");
+  await expect(dlg).toContainText("пропадут: 1 зарядка");
+  await page.click("#dlgImport [data-close]");
+  await expect(dlg).toBeHidden();
+  await expect(page.locator("#list")).toContainText("Новая станция");
+
+  await page.setInputFiles("#fileImport", FIXTURE);
+  await page.click("#btnImportOk");
+  await expect(page.locator("#list")).not.toContainText("Новая станция");
+  await expect(page.locator("#undoBanner")).toBeVisible();
+  await page.click("#btnUndo");
+  await expect(page.locator("#list")).toContainText("Новая станция");
+  await expect(page.locator("#undoBanner")).toBeHidden();
+
+  // без расхождений предупреждения о потерях нет
+  await page.setInputFiles("#fileImport", FIXTURE);
+  await page.click("#btnImportOk");
+  await page.setInputFiles("#fileImport", FIXTURE);
+  await expect(dlg).toBeVisible();
+  await expect(page.locator("#impLost")).toBeHidden();
+  await page.click("#dlgImport [data-close]");
+});
+
+test("вернуть данные до загрузки копии можно из настроек", async ({ page }) => {
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Было", purchaseDate: "2026-08-01", startOdo: 0 }, sessions: [], reminders: [{ id: "my1", title: "Шины", everyKm: 10000, lastOdo: 0 }] });
+  await expect(page.locator("#carName")).toHaveText("Было");
+  // только настройки и напоминание — это тоже данные, без вопроса не заменяем
+  await page.setInputFiles("#fileImport", FIXTURE);
+  await expect(page.locator("#dlgImport")).toContainText("пропадут: 1 напоминание");
+  await page.click("#btnImportOk");
+  await expect(page.locator("#carName")).toHaveText(backup.settings.carName);
+
+  await page.reload(); // плашка уже ушла, а вернуть всё ещё можно
+  await page.click("#btnSettings");
+  const undo = page.locator("#btnUndoImport");
+  await expect(undo).toBeVisible();
+  await undo.click();
+  await expect(undo).toContainText("Точно вернуть?");
+  await undo.click();
+  await expect(page.locator("#carName")).toHaveText("Было");
+  await page.click("#btnSettings");
+  await expect(undo).toBeHidden();
+});
+
+test("напоминания: «сегодня», конец месяца и местное время", async ({ page }) => {
+  // 00:30 по Минску — в UTC ещё 30 января
+  await page.clock.setFixedTime(new Date("2027-01-31T00:30:00+03:00"));
+  await page.goto("./");
+  await page.click("#btnStart");
+  await expect(page.locator("#formSet [name=purchaseDate]")).toHaveValue("2027-01-31");
+  await page.click("#formSet [data-close]");
+
+  await importJson(page, {
+    settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0 },
+    sessions: [],
+    reminders: [{ id: "r1", title: "Страховка", dueDate: "2027-01-31", everyMonths: 1 }],
+  });
+  await page.click("[data-tab=rem]");
+  await expect(page.locator("#remList .rowline")).toContainText("сегодня");
+  await expect(page.locator("#remList .rowline")).toHaveClass(/warn/);
+  await page.click("#remList .rowline");
+  await page.click("#btnRemDone");
+  await expect(page.locator("#remList .rowline")).not.toContainText("сегодня");
+  const r = await page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs["reminders/r1"]);
+  expect(r).toMatchObject({ lastDate: "2027-01-31", dueDate: "2027-02-28" });
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
