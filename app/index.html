@@ -10,10 +10,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* Onest (SIL Open Font License, fonts/OFL.txt): one variable file per alphabet, the browser loads only what the page uses */
+@font-face{font-family:"Onest";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/onest-cyrillic.woff2) format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:"Onest";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/onest-latin-ext.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Onest";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/onest-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{
   --plate:#E4E8EC; --panel:#F4F6F8; --ink:#18202B; --muted:#5B6673; --line:#CBD2D9;
   --drum:#161A20; --drum-ink:#F2F4F6; --red:#C21F2B; --ac:#3F6FA8; --dc:#18202B; --hwy:#C21F2B;
@@ -164,7 +165,6 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .mixbar i{display:block;height:100%}
 .mixleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:6px}
 .mixleg span{display:inline-flex;align-items:center;gap:5px}
-.t-night{background:#7A5BB5}
 .mnote{font-size:12px;color:var(--muted);margin:10px 0 0}
 .banner{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .banner.warn{border-color:var(--red)}
@@ -329,12 +329,13 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <h2>Настройки</h2>
   <div class="fgrid">
     <label class="full">Машина<input name="carName" placeholder="Например, Geely EX5" autocomplete="off"></label>
-    <label>Дата покупки<input type="date" name="purchaseDate" required></label>
-    <label>Пробег при покупке, км<input name="startOdo" inputmode="numeric" required></label>
-    <label>Запас хода при покупке, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
+    <label>Начало учёта<input type="date" name="purchaseDate" required></label>
+    <label>Пробег в начале учёта, км<input name="startOdo" inputmode="numeric" required></label>
+    <label>Запас хода в начале учёта, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
     <label class="full">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
-    <label class="full">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик, например 60,2"></label>
-    <p class="hint full">Пробег при покупке нужен, чтобы не считать чужие километры. Если не знаете, с каким запасом отдали машину, оставьте пустым — стоимость километра покажется диапазоном. Ёмкость нужна для расчёта реального запаса хода.</p>
+    <label class="full">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
+    <p class="hint full">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
+    <p class="hint full">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
   </div>
   <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после загрузки пропадут" hidden style="width:100%;margin-top:14px"></button>
   <div class="sheet-actions">
@@ -377,7 +378,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
       </select>
     </label>
     <label class="full">Пробег, км (необязательно)<input name="odo" inputmode="numeric"></label>
-    <p class="hint full">Текущий — мойка, шиномонтаж. За период — страховка: раскладывается по месяцам. На пробег — шины, колодки: раскладывается по километрам от пробега покупки. Вложение — антикор, ковры, аксессуары: в общую сумму входит, в стоимость километра нет.</p>
+    <p class="hint full">Текущий — мойка, шиномонтаж. За период — страховка: раскладывается по месяцам. На пробег — шины, колодки: раскладывается по километрам, пройденным после расхода. Вложение — антикор, ковры, аксессуары: в общую сумму входит, в стоимость километра нет.</p>
   </div>
   <div class="sheet-actions">
     <button type="button" class="btn danger" id="btnCostDel" hidden>Удалить</button>
@@ -447,7 +448,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.3";
+const APP_VERSION = "1.0.4";
 const DB_KEY = "ev-tracker";
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
@@ -596,7 +597,7 @@ function render(){
   if(st.kmR>0 && st.paid<=0){
     // came with more range than is paid for so far (e.g. 10 km after purchase): the figures would be negative
     $("fPer100").textContent="—"; $("fCons").textContent="—";
-    notes.push("Пока мало данных: машину отдали с бо́льшим запасом хода, чем оплачено сейчас. Цена и расход появятся после следующих зарядок и обновления пробега.");
+    notes.push("Пока мало данных: в начале учёта в батарее было больше, чем оплачено с тех пор. Цена и расход появятся после следующих зарядок и обновления пробега.");
   } else if(st.kmR>0){
     const hi = st.paidMin!=null ? st.paidMin : st.kmR;     // unknown start range: from "came full-ish" …
     const lo = st.paid;                                     // … to "came empty"
@@ -604,7 +605,7 @@ function render(){
     const same = Math.abs(perHi-perLo)<0.05;
     $("fPer100").textContent = same ? fmt(perLo,1) : `${fmt(perLo,1)}–${fmt(perHi,1)}`;
     $("fCons").textContent = same ? fmt(cLo,1) : `${fmt(cLo,0)}–${fmt(cHi,0)}`;
-    if(st.Rr) notes.push(`Цена и расход — на ${dShort(st.Rr.t)}: ${fmtInt(st.kmR)} км пройдено плюс ${fmtInt(st.Rr.range)} км запаса в батарее${S.settings.startRange!=null?` минус ${fmtInt(S.settings.startRange)} км, с которыми отдали машину`:""}. Расход по счётчикам станций, с потерями на зарядку.`);
+    if(st.Rr) notes.push(`Цена и расход — на ${dShort(st.Rr.t)}: ${fmtInt(st.kmR)} км пройдено плюс ${fmtInt(st.Rr.range)} км запаса в батарее${S.settings.startRange!=null?` минус ${fmtInt(S.settings.startRange)} км запаса в начале учёта`:""}. Расход по счётчикам станций, с потерями на зарядку.`);
     else notes.push("Запас хода ещё не указан — расход посчитан только по пройденным километрам и завышен.");
     if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
   } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
@@ -805,9 +806,9 @@ function renderReminders(){
 }
 
 /* ---------- monthly ---------- */
-const MIX = {hwy:{n:"Трасса",c:"t-hwy"}, dc:{n:"DC днём",c:"t-dc"}, night:{n:"Ночью",c:"t-night"}, ac:{n:"AC днём",c:"t-ac"}, free:{n:"Бесплатно",c:"t-free"}};
-const isNight = ts => { const h=parseInt(ts.slice(11,13),10); return h>=21 || h<8; };
-const mixCat = s => isFree(s) ? "free" : s.type==="hwy" ? "hwy" : isNight(s.ts) ? "night" : s.type==="ac" ? "ac" : "dc";
+// night tariffs differ by operator, so "cheap" is judged by the price actually paid, not by the hour
+const MIX = {hwy:{n:"Трасса",c:"t-hwy"}, dc:{n:"DC город",c:"t-dc"}, ac:{n:"AC",c:"t-ac"}, free:{n:"Бесплатно",c:"t-free"}};
+const mixCat = s => isFree(s) ? "free" : TYPES[s.type] ? s.type : "dc";
 function readings(){
   const r=[{t:new Date(S.settings.purchaseDate+"T00:00"), odo:S.settings.startOdo||0, range:S.settings.startRange??null}];
   S.odoLog.forEach(x=>{ if(x.odo!=null&&x.date) r.push({t:new Date(x.date),odo:x.odo,range:x.range??null}); });
@@ -838,11 +839,12 @@ function monthStats(paidAvg){
       if(B.t>A.t&&paid>0){ const inn=S.sessions.filter(s=>inBefore(s,B)&&!inBefore(s,A));
         cons=inn.reduce((a,s)=>a+(s.kwh||0),0)/paid*100; per100=inn.reduce((a,s)=>a+(s.byn||0),0)/paid*100; exact=true; } }
     if(cons===null&&km>50){ cons=kwh/km*100; per100=byn/km*100; }
-    const mix={hwy:0,dc:0,night:0,ac:0,free:0}; real.forEach(s=>mix[mixCat(s)]+=s.kwh);
+    const mix={hwy:0,dc:0,ac:0,free:0}; real.forEach(s=>mix[mixCat(s)]+=s.kwh);
+    const cheapKwh=paidAvg ? real.filter(s=>isFree(s)||s.byn/s.kwh<paidAvg).reduce((a,s)=>a+s.kwh,0) : 0;
     const saved=paidAvg?mix.free*paidAvg:0;
     const partial=end>now;
     const costs=S.costs.reduce((a,c)=>a+costInRange(c,start,to),0);
-    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,partial,costs,saved});
+    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,cheapKwh,partial,costs,saved});
     m++; if(m>11){m=0;y++;}
   }
   return out;
@@ -861,9 +863,8 @@ function renderMonths(st){
     const name=new Date(M.y,M.m,1).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
     const d=document.createElement("div"); d.className="month";
     const mixTot=Object.values(M.mix).reduce((a,b)=>a+b,0);
-    const cheap=mixTot?(M.mix.night+M.mix.ac+M.mix.free)/mixTot*100:0;
     let bar="", leg="";
-    for(const k of ["hwy","dc","night","ac","free"]){ if(!M.mix[k]) continue; const pc=M.mix[k]/mixTot*100;
+    for(const k of ["hwy","dc","ac","free"]){ if(!M.mix[k]) continue; const pc=M.mix[k]/mixTot*100;
       bar+=`<i class="${MIX[k].c}" style="width:${pc.toFixed(1)}%"></i>`;
       leg+=`<span><i class="dot ${MIX[k].c}"></i>${MIX[k].n} ${fmt(pc,0)}%</span>`; }
     const notes=[];
@@ -879,7 +880,7 @@ function renderMonths(st){
         <div><b>${fmt(M.kwh,1)}</b><small>кВт·ч, ${M.n} ${plural(M.n,"зарядка","зарядки","зарядок")}</small></div>
         <div><b>${M.saved?`≈${fmt(M.saved,0)} BYN`:"—"}</b><small>сэкономлено на бесплатных</small></div>
       </div>
-      ${mixTot?`<div class="mix"><small class="muted" style="font-size:12px">Дешёвые и бесплатные (ночь, AC, бесплатно): ${fmt(cheap,0)}%</small><div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
+      ${mixTot?`<div class="mix">${st.paidAvg?`<small class="muted" style="font-size:12px">Дешевле вашей средней цены ${fmt(st.paidAvg)} BYN/кВт·ч: ${fmt(M.cheapKwh/mixTot*100,0)}%</small>`:""}<div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
       ${notes.length?`<p class="mnote">${notes.join(" ")}</p>`:""}`;
     el.appendChild(d);
   });
