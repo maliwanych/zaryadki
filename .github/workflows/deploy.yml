@@ -1,4 +1,5 @@
 # При каждом push в main: прогнать автотесты, и только если они прошли — опубликовать app/ на GitHub Pages.
+# На pull request — только тесты, без публикации.
 # В настройках репозитория: Settings → Pages → Source: GitHub Actions.
 name: Тесты и публикация
 
@@ -8,28 +9,27 @@ on:
   pull_request:
   workflow_dispatch:
 
+# По умолчанию — только чтение. Права на публикацию есть только у шага deploy.
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Готовая «коробка» с браузером и системными пакетами: не нужно ничего ставить при каждом запуске.
+    # Версия должна совпадать с @playwright/test в package.json (это проверяет тест).
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.0-noble
+      options: --user 1001
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npx playwright test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
@@ -40,14 +40,23 @@ jobs:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: read
+    # Публикации идут по очереди и не отменяют друг друга. Проверки pull request в эту очередь не попадают.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: app
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

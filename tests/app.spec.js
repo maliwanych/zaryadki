@@ -220,6 +220,13 @@ test("версия совпадает в index.html, sw.js и package.json", () 
   expect(c).toBe(a);
 });
 
+test("версия Playwright в package.json совпадает с контейнером в GitHub Actions", () => {
+  // Иначе на GitHub тесты запустятся с браузером другой версии и упадут
+  const yml = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "deploy.yml"), "utf8");
+  const image = yml.match(/mcr\.microsoft\.com\/playwright:v([\d.]+)-/)[1];
+  expect(image).toBe(require("../package.json").devDependencies["@playwright/test"]);
+});
+
 test("в приложении нет чужих настроек по умолчанию", () => {
   // Приложение публичное: никаких вшитых дат покупки, пробегов и т.п. от исходной версии
   const html = fs.readFileSync(path.join(__dirname, "..", "app", "index.html"), "utf8");
