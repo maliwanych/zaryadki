@@ -1,8 +1,9 @@
 // Service worker: makes the app open without internet and delivers updates.
 // To ship an update, change VERSION — phones will offer "Доступна новая версия".
-const VERSION = "1.0.3";
+const VERSION = "1.0.4";
 const CACHE = "zaryadki-" + VERSION;
-const SHELL = ["./", "index.html", "privacy.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"];
+const SHELL = ["./", "index.html", "privacy.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png",
+  "fonts/onest-cyrillic.woff2", "fonts/onest-latin.woff2", "fonts/onest-latin-ext.woff2"];
 
 self.addEventListener("install", e => {
   // cache: "reload" — straight from the server: the browser may keep an old index.html for 10 minutes
@@ -24,15 +25,6 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  // Fonts: use the cached copy, refresh it in the background
-  if (url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com")) {
-    e.respondWith(caches.open(CACHE).then(async c => {
-      const hit = await c.match(req);
-      const net = fetch(req).then(r => { c.put(req, r.clone()); return r; }).catch(() => hit);
-      return hit || net;
-    }));
-    return;
-  }
   if (url.origin !== location.origin) return;
   // App files: from the cache first, so the app opens instantly and offline
   e.respondWith(

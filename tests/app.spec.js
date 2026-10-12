@@ -332,11 +332,61 @@ test("страница конфиденциальности: ссылка с г�
   await context.setOffline(false);
 });
 
-test("страница конфиденциальности ничего не загружает с чужих сайтов", () => {
+test("страницы приложения ничего не загружают с чужих сайтов", () => {
   // ссылки для чтения (<a href>) можно, а вот скрипты, стили, шрифты и картинки — только свои
-  const html = fs.readFileSync(path.join(__dirname, "..", "app", "privacy.html"), "utf8");
-  const external = [...html.matchAll(/<(script|link|img|iframe|style)[^>]*>/g)].map(m => m[0]).filter(t => /https?:|\/\//.test(t));
-  expect(external).toEqual([]);
+  for (const page of ["index.html", "privacy.html"]) {
+    const html = fs.readFileSync(path.join(__dirname, "..", "app", page), "utf8");
+    const external = [...html.matchAll(/<(script|link|img|iframe|style)[^>]*>/g)].map(m => m[0]).filter(t => /https?:|\/\//.test(t));
+    expect(external, page).toEqual([]);
+    expect(html, page).not.toMatch(/@import|url\(\s*["']?(https?:)?\/\//);
+  }
+});
+
+test("шрифт свой: обращений к чужим сайтам нет, и без интернета он тоже есть", async ({ page, context }) => {
+  const requests = [];
+  page.on("request", r => requests.push(r.url()));
+  await page.goto("./");
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  expect(requests.filter(u => !/^http:\/\/localhost:8765\//.test(u))).toEqual([]);
+  expect(requests.some(u => u.endsWith("/fonts/onest-cyrillic.woff2"))).toBe(true);
+  // первый запуск закончился — без интернета шрифт берётся из кэша service worker
+  await page.reload();
+  await context.setOffline(true);
+  await page.reload();
+  expect(await page.evaluate(async () => (await document.fonts.load("600 16px Onest", "Ж")).length)).toBeGreaterThan(0);
+  await context.setOffline(false);
+});
+
+test("настройка «Начало учёта»: км и цена считаются с начала учёта", async ({ page }) => {
+  // машине может быть год, но записи ведутся с сегодняшнего дня
+  await page.goto("./");
+  await page.click("#btnStart");
+  await expect(page.locator("#dlgSet")).toContainText("Начало учёта");
+  for (const label of await page.locator("#formSet label").allTextContents()) expect(label).not.toContain("покупк");
+  await page.fill("#formSet [name=startOdo]", "20000");
+  await page.fill("#formSet [name=startRange]", "300");
+  await page.click("#formSet button[type=submit]");
+  await page.click("#btnAdd");
+  await page.fill("#formSess [name=kwh]", "30");
+  await page.fill("#formSess [name=byn]", "15");
+  await page.click("#btnSaveSess");
+  await page.click("#btnOdo");
+  await page.fill("#formOdo [name=odo]", "20200");
+  await page.fill("#formOdo [name=range]", "350");
+  await page.click("#formOdo button[type=submit]");
+  // оплачено: 200 км пройдено + 350 запаса − 300 запаса в начале учёта = 250 км
+  await expect(page.locator("#fPer100")).toHaveText("6,0");
+  await expect(page.locator("#fCons")).toHaveText("12,0");
+  await expect(page.locator("#perNote")).toContainText("в начале учёта");
+});
+
+test("месяц: доля дешёвых — по настоящей цене, без «Ночью»", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page);
+  const aug = page.locator(".month", { hasText: "Август 2026" });
+  // платные: 76,65 BYN за 125 кВт·ч = 0,61 в среднем; дешевле — 35 и 20 кВт·ч, плюс 90 бесплатных: 145 из 215 = 67%
+  await expect(aug).toContainText("Дешевле вашей средней цены 0,61 BYN/кВт·ч: 67%");
+  await expect(aug).not.toContainText("Ночью");
 });
 
 test.describe("подсказка для iPhone", () => {
