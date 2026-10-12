@@ -423,7 +423,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
 function LocalDB(key){
@@ -890,12 +890,14 @@ function setTab(t){
 $("tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-tab]"); if(b) setTab(b.dataset.tab); });
 $("btnAdd").addEventListener("click",()=>FAB[tab][1]());
 
+// editing saves the form on top of the stored record: fields the form doesn't show (socFrom, lastDate, from older versions) stay
+const kept = (list,id) => { const o=id&&list.find(x=>x.id===id); if(!o) return {}; const {id:_,...d}=o; return d; };
 $("formSess").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return;
   const f=e.target; const kwh=num(f.kwh.value), byn=num(f.byn.value);
   if(kwh===null||kwh<0){ toast("Укажите, сколько кВт·ч заряжено"); f.kwh.focus(); return; }
   if(byn===null||byn<0){ toast("Укажите сумму в BYN"); f.byn.focus(); return; }
-  const doc = { ts:f.ts.value, station:f.station.value.trim(), kwh, byn, type:curType,
+  const doc = { ...kept(S.sessions,editingId), ts:f.ts.value, station:f.station.value.trim(), kwh, byn, type:curType,
     odo:num(f.odo.value), socTo:num(f.socTo.value), kwhBat:num(f.kwhBat.value) };
   const btn=$("btnSaveSess"); btn.disabled=true;
   try{
@@ -935,7 +937,7 @@ $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
 $("formSet").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target;
-  try{ await db.doc("meta/settings").set({carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
+  try{ await db.doc("meta/settings").set({...S.settings, carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
@@ -950,7 +952,7 @@ $("formRef").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target; const byn=num(f.byn.value);
   if(byn===null||byn<=0){ toast("Укажите сумму"); return; }
   try{ const ref = editingRef? db.collection("refunds").doc(editingRef) : db.collection("refunds").doc();
-    await ref.set({byn, date:f.date.value||null, note:f.note.value.trim()}); $("dlgRef").close(); toast("Возврат сохранён"); }
+    await ref.set({...kept(S.refunds,editingRef), byn, date:f.date.value||null, note:f.note.value.trim()}); $("dlgRef").close(); toast("Возврат сохранён"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 armDelete($("btnRefDel"), async()=>{ if(!editingRef||!db) return; await db.collection("refunds").doc(editingRef).delete(); $("dlgRef").close(); toast("Возврат удалён"); });
@@ -974,7 +976,7 @@ $("formCost").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target; const byn=num(f.byn.value);
   if(byn===null||byn<=0){ toast("Укажите сумму"); return; }
   try{ const ref=editingCost?db.collection("costs").doc(editingCost):db.collection("costs").doc();
-    await ref.set({byn, date:f.date.value, note:f.note.value.trim(), odo:num(f.odo.value),
+    await ref.set({...kept(S.costs,editingCost), byn, date:f.date.value, note:f.note.value.trim(), odo:num(f.odo.value),
       kind:costKind, periodMonths:costKind==="period"?Number(f.periodMonths.value):null,
       lifeKm:costKind==="km"?(num(f.lifeKm.value)||50000):null});
     $("dlgCost").close(); toast("Расход сохранён"); }
@@ -998,7 +1000,7 @@ $("formRem").addEventListener("submit",async e=>{
   if(!f.title.value.trim()){ toast("Назовите напоминание"); return; }
   if(!num(f.everyKm.value) && !f.dueDate.value){ toast("Задайте интервал в км или дату"); return; }
   try{ const ref=editingRem?db.collection("reminders").doc(editingRem):db.collection("reminders").doc();
-    await ref.set({title:f.title.value.trim(), everyKm:num(f.everyKm.value), lastOdo:num(f.lastOdo.value),
+    await ref.set({...kept(S.reminders,editingRem), title:f.title.value.trim(), everyKm:num(f.everyKm.value), lastOdo:num(f.lastOdo.value),
       dueDate:f.dueDate.value||null, everyMonths:num(f.everyMonths.value)});
     $("dlgRem").close(); toast("Напоминание сохранено"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
@@ -1062,15 +1064,31 @@ $("fileImport").addEventListener("change",async e=>{
   if(!data || !Array.isArray(data.sessions)){ toast("В файле нет зарядок — это не резервная копия трекера"); return; }
   const hasData = S.sessions.length||S.costs.length||S.odoLog.length;
   if(hasData && !confirmReplace()) { toast("Нажмите «Загрузить копию» ещё раз, чтобы заменить текущие данные"); return; }
-  const docs={};
-  const put=(c,arr)=>(arr||[]).forEach(({id,...d})=>{ docs[`${c}/${id||LocalDB.newId()}`]=d; });
-  put("sessions",data.sessions); put("odo",data.odo); put("refunds",data.refunds); put("costs",data.costs); put("reminders",data.reminders);
-  if(data.settings) docs["meta/settings"]=data.settings;
-  if(data.current) docs["meta/current"]=data.current;
+  const docs={}; let skipped=0;
+  const put=(c,arr,numFields,fix=d=>d)=>{ if(!Array.isArray(arr)) return 0; let n=0;
+    arr.forEach(r=>{ const c0=cleanRecord(r,numFields), d=c0&&fix(c0); if(!d){ skipped++; return; }
+      let id=r.id; if((typeof id!=="string"&&typeof id!=="number")||String(id).includes("/")||docs[`${c}/${id}`]) id=LocalDB.newId();
+      docs[`${c}/${id}`]=d; n++; });
+    return n; };
+  const nSess=put("sessions",data.sessions,["kwh","byn","odo","socTo","kwhBat","socFrom"],s=>validTs(s.ts)?{...s,kwh:s.kwh??0,byn:s.byn??0}:null);
+  put("odo",data.odo,["odo","range"]); put("refunds",data.refunds,["byn"]);
+  put("costs",data.costs,["byn","odo","periodMonths","lifeKm"]); put("reminders",data.reminders,["everyKm","lastOdo","everyMonths"]);
+  const settings=cleanRecord(data.settings,["startOdo","startRange","capKwh","carCons"]);
+  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; docs["meta/settings"]=settings; }
+  const current=cleanRecord(data.current,["odo","range"]);
+  if(current) docs["meta/current"]=current;
   docs["meta/backup"]={date:data.exportedAt||new Date().toISOString()};
-  try{ db.replaceAll(docs); toast(`Загружено: ${data.sessions.length} ${plural(data.sessions.length,"зарядка","зарядки","зарядок")}`); }
+  try{ db.replaceAll(docs); toast(`Загружено: ${nSess} ${plural(nSess,"зарядка","зарядки","зарядок")}`+(skipped?`. Пропущено записей с ошибками: ${skipped}`:"")); }
   catch(err){ toast("Не получилось сохранить — не хватает места"); }
 });
+// a backup can be hand-edited or come from an older tracker: keep what is usable, drop what would break every render
+function cleanRecord(r,numFields){
+  if(!r||typeof r!=="object"||Array.isArray(r)) return null;
+  const {id,...d}=r;
+  numFields.forEach(k=>{ if(k in d) d[k]=num(d[k]); });
+  return d;
+}
+const validTs = ts => typeof ts==="string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ts) && !isNaN(new Date(ts));
 let replaceArmedAt=0;
 function confirmReplace(){ const now=Date.now(); if(now-replaceArmedAt<15000){ replaceArmedAt=0; return true; } replaceArmedAt=now; return false; }
 

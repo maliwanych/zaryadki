@@ -2,6 +2,7 @@
 // Запуск: npm test
 const { test, expect } = require("@playwright/test");
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 
 const FIXTURE = path.join(__dirname, "fixtures", "sample-backup.json");
@@ -103,6 +104,111 @@ test("новая версия: плашка и обновление без по�
   } finally {
     fs.writeFileSync(swPath, original);
   }
+});
+
+test("обновление не застревает на старой странице из кэша браузера", async ({ page }) => {
+  // GitHub Pages разрешает браузеру 10 минут хранить файлы у себя (max-age=600). Если новый service worker
+  // возьмёт index.html оттуда, после «Обновить» откроется старая страница. Поднимаем свой сервер с такими же
+  // заголовками и «выпускаем» новую версию прямо в памяти — файлы на диске не трогаем.
+  const app = path.join(__dirname, "..", "app");
+  const types = { ".html": "text/html", ".js": "text/javascript", ".webmanifest": "application/manifest+json", ".png": "image/png" };
+  let release = 1;
+  const server = http.createServer((req, res) => {
+    let file = decodeURIComponent(new URL(req.url, "http://x").pathname).replace(/^\//, "") || "index.html";
+    const full = path.join(app, file);
+    if (!full.startsWith(app) || !fs.existsSync(full)) { res.writeHead(404); return res.end(); }
+    let body = fs.readFileSync(full);
+    if (release === 2 && file === "index.html") body = Buffer.from(body.toString().replace("<head>", '<head><meta name="release" content="2">'));
+    if (release === 2 && file === "sw.js") body = Buffer.from(body.toString().replace(/const VERSION = "[^"]*"/, 'const VERSION = "test-release-2"'));
+    res.writeHead(200, { "Content-Type": types[path.extname(file)] || "application/octet-stream", "Cache-Control": "max-age=600" });
+    res.end(body);
+  });
+  await new Promise(r => server.listen(0, "127.0.0.1", r));
+  try {
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    release = 2;
+    await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
+    await expect(page.locator("#updBanner")).toBeVisible();
+    await Promise.all([page.waitForEvent("load"), page.click("#btnUpdate")]);
+    await expect(page.locator('meta[name="release"]')).toHaveAttribute("content", "2");
+  } finally {
+    await new Promise(r => server.close(r));
+  }
+});
+
+test("испорченная копия не ломает приложение", async ({ page }) => {
+  const bad = {
+    exportedAt: "2026-08-25T10:00:00.000Z",
+    settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0 },
+    sessions: [
+      { id: "ok1", ts: "2026-08-03T18:40", station: "Станция А", kwh: 30, byn: 19.5, type: "dc" },
+      { id: "str", ts: "2026-08-04T10:00", station: "Станция А", kwh: "20,5", byn: "13", type: "dc" },
+      { id: "nots", station: "Без даты", kwh: 10, byn: 5 },
+      null,
+      "мусор",
+    ],
+    odo: { не: "массив" },
+    costs: [null, { id: "c1", byn: 50, date: "2026-08-10", note: "Мойка", kind: "run" }],
+    reminders: [{ id: "a/b", title: "Шины", everyKm: 10000, lastOdo: 0 }],
+  };
+  const file = { name: "zaryadki-backup-bad.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(bad)) };
+  await page.goto("./");
+  await page.setInputFiles("#fileImport", file);
+  await expect(page.locator("#toast")).toContainText("Загружено: 2 зарядки");
+  await expect(page.locator("#toast")).toContainText("Пропущено записей с ошибками: 4");
+  await expect(page.locator("#fKwh")).toHaveText("50,5");
+  // после перезапуска тоже открывается
+  await page.reload();
+  await expect(page.locator("#carName")).toHaveText("Проверка");
+  await expect(page.locator("#fKwh")).toHaveText("50,5");
+  await page.click("[data-tab=rem]");
+  await expect(page.locator("#remList")).toContainText("Шины");
+});
+
+test("правка записи не стирает поля, которых нет в форме", async ({ page }) => {
+  const old = {
+    settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0, legacy: "x" },
+    sessions: [{ id: "s1", ts: "2026-08-03T18:40", station: "Старое", kwh: 30, byn: 19.5, type: "dc", socFrom: 20, socTo: 80 }],
+    reminders: [{ id: "r1", title: "Шины", everyKm: 10000, lastOdo: 0, lastDate: "2026-08-02" }],
+    costs: [{ id: "c1", byn: 50, date: "2026-08-10", note: "Мойка", kind: "run", extra: 1 }],
+  };
+  const file = { name: "old.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(old)) };
+  await page.goto("./");
+  await page.setInputFiles("#fileImport", file);
+  await expect(page.locator("#fKwh")).toHaveText("30,0");
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs);
+
+  await page.click("[data-tab=sessions]");
+  await page.click("#list .sess");
+  await page.fill("#formSess [name=station]", "Новое");
+  await page.click("#btnSaveSess");
+  await expect(page.locator("#list .sess .st")).toHaveText("Новое");
+  await expect(page.locator("#list .sess .meta").first()).toContainText("20→80%");
+
+  await page.click("[data-tab=rem]");
+  await page.click("#remList .rowline");
+  await page.fill("#formRem [name=title]", "Перестановка шин");
+  await page.click("#formRem button[type=submit]");
+  await expect(page.locator("#remList")).toContainText("Перестановка шин");
+
+  await page.click("[data-tab=costs]");
+  await page.click("#costList .rowline");
+  await page.fill("#formCost [name=note]", "Мойка кузова");
+  await page.click("#formCost button[type=submit]");
+  await expect(page.locator("#costList")).toContainText("Мойка кузова");
+
+  await page.click("[data-tab=overview]");
+  await page.click("#btnSettings");
+  await page.fill("#formSet [name=carName]", "Другая");
+  await page.click("#formSet button[type=submit]");
+  await expect(page.locator("#carName")).toHaveText("Другая");
+
+  const d = await stored();
+  expect(d["sessions/s1"]).toMatchObject({ station: "Новое", socFrom: 20, socTo: 80 });
+  expect(d["reminders/r1"]).toMatchObject({ title: "Перестановка шин", lastDate: "2026-08-02" });
+  expect(d["costs/c1"]).toMatchObject({ note: "Мойка кузова", extra: 1 });
+  expect(d["meta/settings"]).toMatchObject({ carName: "Другая", legacy: "x" });
 });
 
 test("версия совпадает в index.html, sw.js и package.json", () => {
