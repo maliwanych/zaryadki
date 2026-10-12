@@ -109,7 +109,7 @@ dialog{border:0;padding:0;background:var(--panel);color:var(--ink);width:100%;ma
 dialog::backdrop{background:rgba(0,0,0,.45)}
 .sheet{padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;max-height:92vh}
 .sheet h2{margin-bottom:14px}
-.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
 .fgrid .full{grid-column:1/-1}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
@@ -205,7 +205,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 
   <div class="tabbed" data-tab="overview"><div class="register-wrap">
     <div class="reg-label">Потрачено на зарядки</div>
-    <div class="reg-row"><div class="register" id="regByn"></div><div class="reg-unit">BYN</div></div>
+    <div class="reg-row"><div class="register" id="regByn"></div><div class="reg-unit cur">BYN</div></div>
     <div class="regsub">
       <div><small id="monthLbl">В этом месяце</small><b id="monthByn">—</b><span id="monthSub"></span></div>
       <div><small>С прочими расходами</small><b id="ownByn">—</b><span>без разовых вложений</span></div>
@@ -213,9 +213,9 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
 
   <div class="figs">
-    <div class="fig"><b id="fPer100">—</b><small>BYN на 100 км</small></div>
+    <div class="fig"><b id="fPer100">—</b><small><span class="cur">BYN</span> на 100 км</small></div>
     <div class="fig"><b id="fCons">—</b><small>кВт·ч на 100 км</small></div>
-    <div class="fig"><b id="fPrice">—</b><small>BYN за кВт·ч в среднем</small></div>
+    <div class="fig"><b id="fPrice">—</b><small><span class="cur">BYN</span> за кВт·ч в среднем</small></div>
     <div class="fig"><b id="fKm">—</b><small>км проехано</small></div>
     <div class="fig"><b id="fKwh">—</b><small>кВт·ч залито</small></div>
     <div class="fig"><b id="fSaved">—</b><small id="fSavedL">сэкономлено на бесплатных зарядках</small></div>
@@ -294,7 +294,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <label class="full">Станция<input name="station" list="stations" placeholder="Название или адрес станции" autocomplete="off"></label>
     <p class="hint full" id="priceHint" hidden></p>
     <label>Заряжено, кВт·ч<input name="kwh" inputmode="decimal" required placeholder="0,00"></label>
-    <label>Сумма, BYN<input name="byn" inputmode="decimal" required placeholder="0,00"></label>
+    <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required placeholder="0,00"></label>
     <div class="full"><label style="margin-bottom:4px">Тип</label>
       <div class="seg" id="typeSeg">
         <button type="button" data-t="ac">AC</button><button type="button" data-t="dc">DC город</button><button type="button" data-t="hwy">Трасса</button>
@@ -332,6 +332,8 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <label>Начало учёта<input type="date" name="purchaseDate" required></label>
     <label>Пробег в начале учёта, км<input name="startOdo" inputmode="numeric" required></label>
     <label>Запас хода в начале учёта, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
+    <label>Валюта<select name="currency"><option value="BYN">BYN</option><option value="RUB">₽ (RUB)</option></select></label>
+    <p class="hint full">Смена валюты меняет только подпись — суммы не пересчитываются.</p>
     <label class="full">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
     <label class="full">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
     <p class="hint full">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
@@ -347,7 +349,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <dialog id="dlgRef"><form class="sheet" id="formRef" method="dialog">
   <h2 id="refTitle">Возврат за поездку</h2>
   <div class="fgrid">
-    <label>Сумма, BYN<input name="byn" inputmode="decimal" required></label>
+    <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required></label>
     <label>Дата<input type="date" name="date"></label>
     <label class="full">За что<input name="note" placeholder="Например, поездка в Брест"></label>
     <p class="hint full">Деньги, которые вам докинули на дорогу. Уменьшают личные траты, но не меняют стоимость километра для машины.</p>
@@ -362,7 +364,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <dialog id="dlgCost"><form class="sheet" id="formCost" method="dialog">
   <h2 id="costTitle">Расход на машину</h2>
   <div class="fgrid">
-    <label>Сумма, BYN<input name="byn" inputmode="decimal" required></label>
+    <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required></label>
     <label>Дата<input type="date" name="date" required></label>
     <label class="full">Что это<input name="note" list="costNotes" placeholder="Страховка, шины, ТО, мойка"></label>
     <div class="full"><label style="margin-bottom:4px">Тип расхода</label>
@@ -440,6 +442,7 @@ const fmtInt = n => Math.round(n).toLocaleString("ru-RU");
 const pad = n => String(n).padStart(2,"0");
 const nowLocal = () => { const d=new Date(); return `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const cssv = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const cur = () => CURRENCIES[S.settings.currency] || "BYN";
 const glitch = s => (s.kwh||0) < 1;
 const isFree = s => !glitch(s) && (s.byn||0)===0;
 const plural = (n,a,b,c) => { const m10=n%10, m100=n%100; return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20))?b:c; };
@@ -448,7 +451,8 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.4";
+const APP_VERSION = "1.0.5";
+const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
@@ -583,6 +587,10 @@ function render(){
   backupNag();
   iosHint();
 
+  document.querySelectorAll(".cur").forEach(e=>{ e.textContent=cur(); });
+  // roubles add up fast: one more drum once the total passes 99 999,99
+  const digits=Math.max(5,String(Math.floor(st.totByn)).length);
+  if($("regByn")._digits!==digits) buildRegister($("regByn"),digits);
   // the first frame animates from zero; later renders may land before it, so it reads the latest total
   lastTotal = st.totByn;
   if(firstPaint){ firstPaint=false; requestAnimationFrame(()=>requestAnimationFrame(()=>setRegister($("regByn"),lastTotal))); }
@@ -591,7 +599,7 @@ function render(){
   $("fPrice").textContent = st.rKwh>0 ? fmt(st.rByn/st.rKwh) : "—";
   $("fKm").textContent = st.km>0 ? fmtInt(st.km) : "—";
   $("fKwh").textContent = fmt(st.totKwh,1);
-  $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} BYN` : "—";
+  $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} ${cur()}` : "—";
   $("fSavedL").textContent = st.freeKwh>0 ? `сэкономлено на бесплатных ${fmt(st.freeKwh,0)} кВт·ч` : "сэкономлено на бесплатных зарядках";
   const notes = [];
   if(st.kmR>0 && st.paid<=0){
@@ -609,14 +617,14 @@ function render(){
     else notes.push("Запас хода ещё не указан — расход посчитан только по пройденным километрам и завышен.");
     if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
   } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
-  if(st.paidAvg!=null && st.freeKwh>0) notes.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} BYN/кВт·ч — по этой цене считается экономия.`);
+  if(st.paidAvg!=null && st.freeKwh>0) notes.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} ${cur()}/кВт·ч — по этой цене считается экономия.`);
   // under the meter: this month's charging and the running cost of the car
   const now=new Date(), mKey=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
   const mS=S.sessions.filter(x=>x.ts.slice(0,7)===mKey && !glitch(x));
   $("monthLbl").textContent = "В " + now.toLocaleDateString("ru-RU",{month:"long"}).replace(/ь$/,"е").replace(/й$/,"е").replace(/т$/,"те");
-  $("monthByn").textContent = `${fmt(mS.reduce((a,x)=>a+(x.byn||0),0))} BYN`;
+  $("monthByn").textContent = `${fmt(mS.reduce((a,x)=>a+(x.byn||0),0))} ${cur()}`;
   $("monthSub").textContent = `${mS.length} ${plural(mS.length,"зарядка","зарядки","зарядок")}, ${fmt(mS.reduce((a,x)=>a+x.kwh,0),0)} кВт·ч`;
-  $("ownByn").textContent = `${fmt(st.totByn + S.costs.reduce((a,c)=>a+accrued(c,now),0))} BYN`;
+  $("ownByn").textContent = `${fmt(st.totByn + S.costs.reduce((a,c)=>a+accrued(c,now),0))} ${cur()}`;
   const withBat=S.sessions.filter(x=>x.kwhBat&&x.kwh);
   if(withBat.length){
     const w=withBat.reduce((a,x)=>a+x.kwh,0), b=withBat.reduce((a,x)=>a+x.kwhBat,0);
@@ -637,7 +645,7 @@ function render(){
   const maxP = Math.max(...Object.values(st.byType).map(b=>b.kwh?b.byn/b.kwh:0),0.01);
   for(const t in TYPES){ const b=st.byType[t]; if(!b.n) continue;
     const p=b.byn/b.kwh; const row=document.createElement("div"); row.className="trow";
-    row.innerHTML = `<span class="dot ${TYPES[t].cls}"></span><span>${TYPES[t].name} <span class="muted" style="font-size:13px">· ${b.n} шт., ${fmt(b.byn)} BYN</span></span><span class="price">${fmt(p)}</span><div class="bar"><i class="${TYPES[t].cls}" style="width:${(p/maxP*100).toFixed(1)}%"></i></div>`;
+    row.innerHTML = `<span class="dot ${TYPES[t].cls}"></span><span>${TYPES[t].name} <span class="muted" style="font-size:13px">· ${b.n} шт., ${fmt(b.byn)} ${cur()}</span></span><span class="price">${fmt(p)}</span><div class="bar"><i class="${TYPES[t].cls}" style="width:${(p/maxP*100).toFixed(1)}%"></i></div>`;
     tEl.appendChild(row); }
   if(st.free.n){ const row=document.createElement("div"); row.className="trow";
     row.innerHTML=`<span class="dot t-free"></span><span>Бесплатно <span class="muted" style="font-size:13px">· ${st.free.n} шт., ${fmt(st.free.kwh,1)} кВт·ч</span></span><span class="price">0,00</span>`;
@@ -659,7 +667,7 @@ function render(){
       const allKm=R.reduce((a,x)=>a+x.km,0), allBat=R.reduce((a,x)=>a+x.bat,0), avgR=cap*allKm/allBat;
       rangeHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><b style="font-size:20px">≈${fmtInt(lastR)} км</b><div class="muted" style="font-size:13px">реальный запас на полном заряде — по последнему интервалу (${fmtInt(last.km)} км, машина приняла ${fmt(last.bat,1)} кВт·ч, ${fmt(last.bat/last.km*100,1)} кВт·ч/100 км без потерь на зарядку)${R.length>1?`. В среднем по ${R.length} интервалам — ≈${fmtInt(avgR)} км`:""}. Считается от полезной ёмкости ${fmt(cap,1)} кВт·ч.</div></div>`;
     }
-    $("f2f").innerHTML = `<div class="odo-row"><div><b>${fmt(st.f.kwh/st.f.km*100,1)} кВт·ч</b> <span class="muted">и</span> <b>${fmt(st.f.byn/st.f.km*100,1)} BYN</b><div class="muted" style="font-size:13px">на 100 км, по ${st.f.n} ${plural(st.f.n,"интервалу","интервалам","интервалам")} от полного до полного, ${fmtInt(st.f.km)} км</div></div></div>` + rangeHtml;
+    $("f2f").innerHTML = `<div class="odo-row"><div><b>${fmt(st.f.kwh/st.f.km*100,1)} кВт·ч</b> <span class="muted">и</span> <b>${fmt(st.f.byn/st.f.km*100,1)} ${cur()}</b><div class="muted" style="font-size:13px">на 100 км, по ${st.f.n} ${plural(st.f.n,"интервалу","интервалам","интервалам")} от полного до полного, ${fmtInt(st.f.km)} км</div></div></div>` + rangeHtml;
   } else { $("f2fSec").dataset.empty="1"; $("f2fSec").hidden=true; }
 
   renderList(st.ss);
@@ -679,7 +687,7 @@ function renderList(ss){
     const g=document.createElement("div"); g.className="day";
     const d=new Date(k+"T00:00");
     const sum=groups[k].reduce((a,s)=>a+(s.byn||0),0);
-    g.innerHTML=`<h3>${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",weekday:"short"})} · ${fmt(sum)} BYN</h3>`;
+    g.innerHTML=`<h3>${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",weekday:"short"})} · ${fmt(sum)} ${cur()}</h3>`;
     groups[k].forEach(s=>{
       const b=document.createElement("button"); b.type="button"; b.className="sess"+(glitch(s)?" glitch":"");
       const t=TYPES[s.type]||TYPES.dc; const p = s.kwh? s.byn/s.kwh : 0;
@@ -687,7 +695,7 @@ function renderList(ss){
       if(s.socFrom!=null&&s.socTo!=null) bits.push(`${s.socFrom}→${s.socTo}%`); else if(s.socTo!=null) bits.push(`до ${s.socTo}%`);
       if(s.odo!=null) bits.push(`${fmtInt(s.odo)} км`);
       if(s.kwhBat&&s.kwh) bits.push(`потери ${fmt((s.kwh/s.kwhBat-1)*100,0)}%`);
-      b.innerHTML=`<span class="stripe ${t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} BYN</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
+      b.innerHTML=`<span class="stripe ${t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} ${cur()}</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
       b.querySelector(".st").textContent = s.station || "Без названия";
       b.querySelectorAll(".meta")[0].textContent = bits.join(" · ");
       b.addEventListener("click",()=>openSess(s));
@@ -720,8 +728,8 @@ function renderStations(){
   el.innerHTML="";
   rows.forEach(r=>{
     const d=document.createElement("div"); d.className="rowline";
-    d.innerHTML=`<span class="l"><b></b><small>${r.n} ${plural(r.n,"зарядка","зарядки","зарядок")} · ${fmt(r.kwh,1)} кВт·ч · ${fmt(r.byn)} BYN</small></span>
-      <span class="r"><b>${fmt(r.price)}</b><small>BYN/кВт·ч</small></span>`;
+    d.innerHTML=`<span class="l"><b></b><small>${r.n} ${plural(r.n,"зарядка","зарядки","зарядок")} · ${fmt(r.kwh,1)} кВт·ч · ${fmt(r.byn)} ${cur()}</small></span>
+      <span class="r"><b>${fmt(r.price)}</b><small>${cur()}/кВт·ч</small></span>`;
     d.querySelector("b").textContent=r.name; el.appendChild(d);
   });
   const cheap=rows[0], dear=rows[rows.length-1];
@@ -755,7 +763,7 @@ function renderCosts(st){
   const tot=S.costs.reduce((a,c)=>a+(c.byn||0),0);
   const invest=S.costs.filter(c=>c.kind==="invest").reduce((a,c)=>a+(c.byn||0),0);
   const acc=S.costs.reduce((a,c)=>a+accrued(c,new Date()),0);
-  $("costTotal").textContent=`${fmt(tot)} BYN`;
+  $("costTotal").textContent=`${fmt(tot)} ${cur()}`;
   const el=$("costList"); el.innerHTML="";
   S.costs.slice().sort((a,b)=>(a.date||"")<(b.date||"")?1:-1).forEach(c=>{
     const b=document.createElement("button"); b.type="button"; b.className="rowline";
@@ -763,7 +771,7 @@ function renderCosts(st){
     if(c.date) bits.push(new Date(c.date+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"}));
     bits.push(c.kind==="period" ? `за ${c.periodMonths||12} мес.` : c.kind==="km"&&c.lifeKm ? `на ${fmtInt(c.lifeKm)} км` : KIND[c.kind||"run"]);
     if(c.odo!=null) bits.push(`${fmtInt(c.odo)} км`);
-    b.innerHTML=`<span class="l"><b></b><small>${bits.join(" · ")}</small></span><span class="r"><b>${fmt(c.byn||0)} BYN</b>${c.kind==="period"||c.kind==="km"?`<small>${fmt(accrued(c,new Date()))} уже прошло</small>`:""}</span>`;
+    b.innerHTML=`<span class="l"><b></b><small>${bits.join(" · ")}</small></span><span class="r"><b>${fmt(c.byn||0)} ${cur()}</b>${c.kind==="period"||c.kind==="km"?`<small>${fmt(accrued(c,new Date()))} уже прошло</small>`:""}</span>`;
     b.querySelector("b").textContent=c.note||"Расход";
     b.addEventListener("click",()=>openCost(c)); el.appendChild(b);
   });
@@ -771,7 +779,7 @@ function renderCosts(st){
   const note=$("ownNote");
   if(tot>0 && st.km>0){
     const chargePer100=st.paid>0?st.pByn/st.paid*100:0, costPer100=acc/st.km*100;
-    note.textContent=`Разовые вложения — ${fmt(invest)} BYN, в стоимость километра не входят. Текущих расходов накоплено ${fmt(acc)} BYN. Владение обходится в ${fmt(chargePer100+costPer100,1)} BYN на 100 км: ${fmt(chargePer100,1)} зарядки плюс ${fmt(costPer100,1)} прочее.`;
+    note.textContent=`Разовые вложения — ${fmt(invest)} ${cur()}, в стоимость километра не входят. Текущих расходов накоплено ${fmt(acc)} ${cur()}. Владение обходится в ${fmt(chargePer100+costPer100,1)} ${cur()} на 100 км: ${fmt(chargePer100,1)} зарядки плюс ${fmt(costPer100,1)} прочее.`;
   } else note.textContent="";
 }
 
@@ -872,15 +880,15 @@ function renderMonths(st){
     d.innerHTML=`<h3><span>${name[0].toUpperCase()+name.slice(1)}</span><small>${M.partial?"идёт":""}</small></h3>
       <div class="mgrid">
         <div><b>${fmtInt(M.km)} км</b><small>проехано</small></div>
-        <div><b>${fmt(M.byn)} BYN</b><small>на зарядки</small></div>
+        <div><b>${fmt(M.byn)} ${cur()}</b><small>на зарядки</small></div>
         <div><b>${M.cons!=null?(M.exact?"":"≈")+fmt(M.cons,1):"—"}${delta(M.cons,P&&P.cons,true)}</b><small>кВт·ч на 100 км</small></div>
-        <div><b>${M.per100!=null?(M.exact?"":"≈")+fmt(M.per100,1):"—"}${delta(M.per100,P&&P.per100,true)}</b><small>BYN на 100 км</small></div>
-        <div><b>${M.price!=null?fmt(M.price):"—"}${delta(M.price,P&&P.price,true,2)}</b><small>BYN за кВт·ч</small></div>
-        <div><b>${fmt(M.costs)} BYN</b><small>прочие расходы</small></div>
+        <div><b>${M.per100!=null?(M.exact?"":"≈")+fmt(M.per100,1):"—"}${delta(M.per100,P&&P.per100,true)}</b><small>${cur()} на 100 км</small></div>
+        <div><b>${M.price!=null?fmt(M.price):"—"}${delta(M.price,P&&P.price,true,2)}</b><small>${cur()} за кВт·ч</small></div>
+        <div><b>${fmt(M.costs)} ${cur()}</b><small>прочие расходы</small></div>
         <div><b>${fmt(M.kwh,1)}</b><small>кВт·ч, ${M.n} ${plural(M.n,"зарядка","зарядки","зарядок")}</small></div>
-        <div><b>${M.saved?`≈${fmt(M.saved,0)} BYN`:"—"}</b><small>сэкономлено на бесплатных</small></div>
+        <div><b>${M.saved?`≈${fmt(M.saved,0)} ${cur()}`:"—"}</b><small>сэкономлено на бесплатных</small></div>
       </div>
-      ${mixTot?`<div class="mix">${st.paidAvg?`<small class="muted" style="font-size:12px">Дешевле вашей средней цены ${fmt(st.paidAvg)} BYN/кВт·ч: ${fmt(M.cheapKwh/mixTot*100,0)}%</small>`:""}<div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
+      ${mixTot?`<div class="mix">${st.paidAvg?`<small class="muted" style="font-size:12px">Дешевле вашей средней цены ${fmt(st.paidAvg)} ${cur()}/кВт·ч: ${fmt(M.cheapKwh/mixTot*100,0)}%</small>`:""}<div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
       ${notes.length?`<p class="mnote">${notes.join(" ")}</p>`:""}`;
     el.appendChild(d);
   });
@@ -927,7 +935,7 @@ $("formSess").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return;
   const f=e.target; const kwh=num(f.kwh.value), byn=num(f.byn.value);
   if(kwh===null||kwh<0){ toast("Укажите, сколько кВт·ч заряжено"); f.kwh.focus(); return; }
-  if(byn===null||byn<0){ toast("Укажите сумму в BYN"); f.byn.focus(); return; }
+  if(byn===null||byn<0){ toast(`Укажите сумму в ${cur()}`); f.byn.focus(); return; }
   const doc = { ...kept(S.sessions,editingId), ts:f.ts.value, station:f.station.value.trim(), kwh, byn, type:curType,
     odo:num(f.odo.value), socTo:num(f.socTo.value), kwhBat:num(f.kwhBat.value) };
   const btn=$("btnSaveSess"); btn.disabled=true;
@@ -964,7 +972,7 @@ $("formOdo").addEventListener("submit",async e=>{
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
-function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??"";
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=CURRENCIES[S.settings.currency]?S.settings.currency:"BYN";
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
   if(u) b.dataset.label=`Вернуть данные до загрузки копии (${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})})`;
   disarm(b); $("dlgSet").showModal(); }
@@ -972,7 +980,7 @@ $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
 $("formSet").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target;
-  try{ await db.doc("meta/settings").set({...S.settings, carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
+  try{ await db.doc("meta/settings").set({...S.settings, carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), currency:f.currency.value, carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
@@ -1054,7 +1062,7 @@ armConfirm($("btnRemDel"), async()=>{ if(!editingRem||!db) return; await db.coll
 /* ---------- quick entry ---------- */
 function applyPriceHint(){
   const f=$("formSess"); const p=stationPrice(f.station.value.trim()); const h=$("priceHint");
-  if(p!=null){ h.hidden=false; h.textContent= p===0 ? "Здесь заряжаетесь бесплатно — сумма 0." : `Последняя цена здесь — ${fmt(p)} BYN/кВт·ч. Сумма посчитается сама.`; }
+  if(p!=null){ h.hidden=false; h.textContent= p===0 ? "Здесь заряжаетесь бесплатно — сумма 0." : `Последняя цена здесь — ${fmt(p)} ${cur()}/кВт·ч. Сумма посчитается сама.`; }
   else { h.hidden=true; }
   return p;
 }
@@ -1071,7 +1079,7 @@ $("formSess").byn.addEventListener("input",()=>{ bynTouched=true; });
 /* ---------- CSV ---------- */
 $("btnCsv").addEventListener("click",async()=>{
   if(!downloads) return;
-  const rows=[["Дата","Время","Станция","Тип","кВт·ч из сети","BYN","BYN/кВт·ч","Одометр","% после","кВт·ч в батарею"]];
+  const rows=[["Дата","Время","Станция","Тип","кВт·ч из сети",cur(),`${cur()}/кВт·ч`,"Одометр","% после","кВт·ч в батарею"]];
   S.sessions.slice().sort((a,b)=>a.ts<b.ts?-1:1).forEach(s=>rows.push([s.ts.slice(0,10),s.ts.slice(11,16),s.station||"",(TYPES[s.type]||TYPES.dc).name,fmt(s.kwh),fmt(s.byn),s.kwh?fmt(s.byn/s.kwh,3):"",s.odo??"",s.socTo??"",s.kwhBat!=null?fmt(s.kwhBat):""]));
   const csv="\uFEFF"+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;}).join(";")).join("\r\n");
   try{ await downloads.save({filename:`zaryadki-${localDate(new Date())}.csv`, data:csv}); toast("Файл сохранён"); }
@@ -1107,7 +1115,7 @@ $("fileImport").addEventListener("change",async e=>{
   put("odo",data.odo,["odo","range"]); put("refunds",data.refunds,["byn"]);
   put("costs",data.costs,["byn","odo","periodMonths","lifeKm"]); put("reminders",data.reminders,["everyKm","lastOdo","everyMonths"]);
   const settings=cleanRecord(data.settings,["startOdo","startRange","capKwh","carCons"]);
-  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; docs["meta/settings"]=settings; }
+  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; if(!CURRENCIES[settings.currency]) delete settings.currency; docs["meta/settings"]=settings; }
   const current=cleanRecord(data.current,["odo","range"]);
   if(current) docs["meta/current"]=current;
   docs["meta/backup"]={date:data.exportedAt||new Date().toISOString()};
