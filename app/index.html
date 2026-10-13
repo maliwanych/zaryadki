@@ -184,6 +184,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <body>
 <main>
   <div class="banner" id="updBanner" hidden><span>Доступна новая версия</span><button class="link-btn" id="btnUpdate">Обновить</button></div>
+  <div class="banner" id="demoBanner" hidden><span>Это пример с вымышленными данными. Пробуйте что угодно — при выходе всё сотрётся.</span><button class="link-btn" id="btnDemoExit">Выйти</button></div>
   <div class="banner" id="undoBanner" hidden><span>Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
   <div class="banner ios" id="iosHint" hidden><span id="iosText"></span><button class="link-btn" id="btnIosHint">Понятно</button></div>
   <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
@@ -194,6 +195,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <div class="row">
       <button class="btn primary" id="btnStart">Настроить машину</button>
       <button class="btn" id="btnImport1">Загрузить копию</button>
+      <button class="btn" id="btnDemo">Посмотреть пример</button>
     </div>
   </div>
   <nav class="tabs" id="tabs" role="tablist">
@@ -451,9 +453,11 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.5";
+const APP_VERSION = "1.0.6";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
+const DEMO_KEY = DB_KEY+"-demo";
+const DEMO = (()=>{ try{ return sessionStorage.getItem(DEMO_KEY)==="1" && localStorage.getItem(DEMO_KEY)!==null; }catch(e){ return false; } })();
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
 function LocalDB(key){
@@ -583,7 +587,7 @@ function render(){
   $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"});
   $("carName").textContent = S.settings.carName || "Мой электромобиль";
   document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
-  $("welcome").hidden = S.configured;
+  $("welcome").hidden = S.configured || DEMO;
   backupNag();
   iosHint();
 
@@ -1079,6 +1083,7 @@ $("formSess").byn.addEventListener("input",()=>{ bynTouched=true; });
 /* ---------- CSV ---------- */
 $("btnCsv").addEventListener("click",async()=>{
   if(!downloads) return;
+  if(DEMO){ toast(NOT_IN_DEMO); return; }
   const rows=[["Дата","Время","Станция","Тип","кВт·ч из сети",cur(),`${cur()}/кВт·ч`,"Одометр","% после","кВт·ч в батарею"]];
   S.sessions.slice().sort((a,b)=>a.ts<b.ts?-1:1).forEach(s=>rows.push([s.ts.slice(0,10),s.ts.slice(11,16),s.station||"",(TYPES[s.type]||TYPES.dc).name,fmt(s.kwh),fmt(s.byn),s.kwh?fmt(s.byn/s.kwh,3):"",s.odo??"",s.socTo??"",s.kwhBat!=null?fmt(s.kwhBat):""]));
   const csv="\uFEFF"+rows.map(r=>r.map(v=>{v=String(v);return /[;"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;}).join(";")).join("\r\n");
@@ -1088,6 +1093,7 @@ $("btnCsv").addEventListener("click",async()=>{
 
 $("btnJson").addEventListener("click",async()=>{
   if(!downloads) return;
+  if(DEMO){ toast(NOT_IN_DEMO); return; }
   const strip = a => a.map(({id,...d})=>({id,...d}));
   const data={exportedAt:new Date().toISOString(), settings:S.settings, current:S.current, sessions:strip(S.sessions), odo:strip(S.odoLog), refunds:strip(S.refunds), costs:strip(S.costs), reminders:strip(S.reminders)};
   try{ await downloads.save({filename:`zaryadki-backup-${localDate(new Date())}.json`, data:JSON.stringify(data,null,2)});
@@ -1097,7 +1103,8 @@ $("btnJson").addEventListener("click",async()=>{
 $("btnBak2").addEventListener("click",()=>$("btnJson").click());
 
 /* ---------- import from a backup (this app's or the Claude tracker's) ---------- */
-const openImport=()=>$("fileImport").click();
+const NOT_IN_DEMO="В примере это недоступно — выйдите из примера";
+const openImport=()=>{ if(DEMO){ toast(NOT_IN_DEMO); return; } $("fileImport").click(); };
 $("btnImport").addEventListener("click",openImport);
 $("btnImport1").addEventListener("click",openImport);
 $("fileImport").addEventListener("change",async e=>{
@@ -1153,7 +1160,7 @@ function applyImport(docs,done,keepUndo){
   catch(err){ toast("Не получилось сохранить — не хватает места"); return; }
   if(keepUndo&&readUndo()){ $("undoBanner").hidden=false; clearTimeout(applyImport._t); applyImport._t=setTimeout(()=>{ $("undoBanner").hidden=true; },10000); }
 }
-function readUndo(){ try{ const u=JSON.parse(localStorage.getItem(UNDO_KEY)||"null"); return u&&u.data?u:null; }catch(e){ return null; } }
+function readUndo(){ if(DEMO) return null; try{ const u=JSON.parse(localStorage.getItem(UNDO_KEY)||"null"); return u&&u.data?u:null; }catch(e){ return null; } }
 async function undoImport(){
   const u=readUndo(); if(!u) return;
   db.replaceAll(JSON.parse(u.data).docs||{});   // throws on a full storage → the caller shows a toast
@@ -1186,10 +1193,47 @@ function iosHint(){
 }
 $("btnIosHint").addEventListener("click",()=>{ try{ localStorage.setItem(IOS_HINT_KEY,"1"); }catch(e){} $("iosHint").hidden=true; });
 
+/* ---------- example for a first look: fictional data, built relative to today, never touches the real key ---------- */
+function demoDocs(now){
+  const start=new Date(now.getFullYear(), now.getMonth(), now.getDate()-91);
+  let seed=7; const rnd=()=>(seed=seed*16807%2147483647)/2147483647;   // same numbers every time
+  const at=(d,h,m=0)=>{ const t=new Date(start); t.setDate(t.getDate()+d); t.setHours(h,m,0,0); return t; };
+  const odoAt=(d,h)=>Math.round(4200+(d+h/24)*44);                     // ~44 km a day
+  const docs={
+    "meta/settings":{carName:"Geely EX5 (пример)", purchaseDate:localDate(start), startOdo:4200, startRange:380, capKwh:60, carCons:15.5, currency:"BYN"},
+    "meta/backup":{date:now.toISOString()},
+  };
+  const PLAN=[["Дом","ac",0.25,23,30],["Работа","ac",0,10,18],["ТЦ","dc",0.69,18,32],["Дом","ac",0.25,23,28]];
+  let n=0;
+  const add=(d,[station,type,price,h,base],o={})=>{
+    const t=at(d,h,Math.floor(rnd()*50)), kwh=o.kwh??Math.round((base+rnd()*6)*10)/10;
+    docs[`sessions/demo${String(++n).padStart(2,"0")}`]={ts:`${localDate(t)}T${pad(t.getHours())}:${pad(t.getMinutes())}`, station, kwh,
+      byn:Math.round(kwh*price*100)/100, type, odo:odoAt(d,h), socTo:station==="Дом"?100:null, kwhBat:o.kwh?null:Math.round(kwh*0.92*10)/10};
+  };
+  for(let d=2,i=0; d<=88; d+=3+Math.round(rnd()), i++) add(d, i===9||i===19 ? ["Трасса М1","hwy",0.79,14,38] : PLAN[i%PLAN.length]);
+  add(45,["ТЦ","dc",0.69,19,0],{kwh:0.4});                               // a failed start
+  const reading=(d,range)=>({date:at(d,21).toISOString(), odo:odoAt(d,21), range});
+  docs["odo/demo1"]=reading(30,255); docs["odo/demo2"]=reading(61,290); docs["odo/demo3"]=docs["meta/current"]=reading(90,320);
+  const cost=(d,byn,note,kind,x={})=>({byn, date:localDate(at(d,12)), note, kind, odo:null, periodMonths:null, lifeKm:null, ...x});
+  docs["costs/demo1"]=cost(0,180,"Страховка","period",{periodMonths:12, odo:4200});
+  docs["costs/demo2"]=cost(20,15,"Мойка","run"); docs["costs/demo3"]=cost(70,15,"Мойка","run");
+  docs["costs/demo4"]=cost(40,960,"Зимние шины","km",{lifeKm:40000, odo:odoAt(40,12)});
+  docs["costs/demo5"]=cost(5,120,"Коврики","invest");
+  docs["reminders/demo1"]={title:"Перестановка шин", everyKm:10000, lastOdo:4200, dueDate:null, everyMonths:null};
+  docs["reminders/demo2"]={title:"Страховка", everyKm:null, lastOdo:null, dueDate:localDate(at(365,12)), everyMonths:12};
+  return docs;
+}
+$("btnDemo").addEventListener("click",()=>{
+  try{ localStorage.setItem(DEMO_KEY, JSON.stringify({schema:1, docs:demoDocs(new Date())})); sessionStorage.setItem(DEMO_KEY,"1"); }
+  catch(e){ toast("Не получилось открыть пример"); return; }
+  location.reload();
+});
+$("btnDemoExit").addEventListener("click",()=>{ try{ localStorage.removeItem(DEMO_KEY); sessionStorage.removeItem(DEMO_KEY); }catch(e){} location.reload(); });
+
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){
   const n=S.sessions.length+S.costs.length; const el=$("bakBanner");
-  if(n<5){ el.hidden=true; return; }
+  if(n<5||DEMO){ el.hidden=true; return; }
   const last=S.backup&&S.backup.date?new Date(S.backup.date):null;
   const days=last?Math.floor((Date.now()-last)/864e5):null;
   if(days!=null && days<30){ el.hidden=true; return; }
@@ -1201,7 +1245,9 @@ function backupNag(){
 setTab("overview");
 render();
 (()=>{
-  db = LocalDB(DB_KEY);
+  db = LocalDB(DEMO ? DEMO_KEY : DB_KEY);
+  $("demoBanner").hidden = !DEMO;
+  if(!DEMO) try{ localStorage.removeItem(DEMO_KEY); }catch(e){}   // left over when the app was closed inside the example
   downloads = { save: saveFile };
   $("btnAdd").disabled=false; $("btnCsv").hidden=false; $("btnJson").hidden=false;
   $("appVer").textContent = APP_VERSION;
