@@ -82,11 +82,28 @@ section{margin-top:28px}
 .bar{height:6px;border-radius:3px;background:var(--line);grid-column:2/4;overflow:hidden;margin-top:-4px}
 .bar i{display:block;height:100%}
 
-/* Chart */
-.chart svg{width:100%;height:auto;display:block}
-.chart text{fill:var(--muted);font-size:10px;font-family:inherit}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
-.legend span{display:inline-flex;align-items:center;gap:6px}
+/* Chart: months as bars, one metric at a time */
+.chart{display:flex;flex-direction:column;gap:12px}
+.chart h2{margin:0}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills button{border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;background:transparent;min-height:40px}
+.pills button[aria-pressed="true"]{background:var(--ink);color:var(--plate);border-color:var(--ink);font-weight:600}
+.chart-area{position:relative;height:180px;border-bottom:1px solid var(--line)}
+.chart-ref{position:absolute;left:0;right:0;border-top:1px dashed var(--muted)}
+.chart-ref span{position:absolute;right:0;bottom:2px;font-size:11px;color:var(--muted);background:var(--panel);padding-left:6px;white-space:nowrap}
+.chart-bars{position:absolute;top:0;bottom:0;left:0;right:64px;display:flex;align-items:flex-end;gap:var(--gap)}
+.chart-bars button{flex:1 1 0;min-width:0;height:100%;background:none;border:0;padding:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.chart-bars small{font-size:12px;color:var(--muted);white-space:nowrap}
+.chart-bars i{display:block;width:100%;max-width:40px;border-radius:6px 6px 0 0;background:var(--ac)}
+.chart-bars .partial i{opacity:.45}
+.chart-bars .sel i{background:var(--ink);opacity:1}
+.chart-bars .sel small{color:var(--ink);font-weight:700}
+.chart-labels{display:flex;gap:var(--gap);margin:-6px 64px 0 0}
+.chart-labels span{flex:1 1 0;min-width:0;text-align:center;font-size:12px;color:var(--muted)}
+.chart-sel{background:var(--plate);border-radius:10px;padding:10px 12px;font-size:13px}
+.chart-sel span{color:var(--muted)}
+.f2f-big{font-size:30px;font-weight:700;line-height:1.2}
+.f2f-cons{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:14px}
 
 /* Sessions */
 .day{margin-top:16px}
@@ -119,6 +136,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .seg.four{grid-template-columns:repeat(4,1fr)}
 .seg.four button{font-size:13px;padding:10px 2px}
 .note p{margin:0 0 4px}
+.note .link-btn{font-size:13px;padding:4px 0}
 .t-free{background:#3E9B6A}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--plate);font-weight:600}
 .hint{font-size:12px;color:var(--muted);margin:0}
@@ -224,7 +242,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
   <div class="note" id="perNote"></div></div>
 
-  <section data-tab="overview">
+  <section id="odoSec" data-tab="overview">
     <div class="card">
       <div class="odo-row">
         <div><div class="muted" style="font-size:13px">Пробег и запас хода</div><b id="odoNow">—</b></div>
@@ -234,14 +252,28 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     </div>
   </section>
 
-  <section data-tab="overview">
-    <h2>Цена кВт·ч по типу зарядки</h2>
-    <div class="card types" id="types"></div>
+  <section id="f2fSec" data-tab="overview" data-empty="1" hidden>
+    <div class="card" id="f2f"></div>
   </section>
 
-  <section data-tab="overview">
-    <h2>По месяцам</h2>
+  <section id="chartSec" data-tab="overview" data-empty="1" hidden>
+    <div class="card chart">
+      <div class="cardhead"><h2>По месяцам</h2><small class="muted">последние 12 месяцев</small></div>
+      <div class="pills" id="chartPills" role="group" aria-label="Что показывать"></div>
+      <div class="chart-area" id="chartArea"></div>
+      <div class="chart-labels" id="chartLabels" aria-hidden="true"></div>
+      <div class="chart-sel" id="chartSel" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="monthsSec" data-tab="overview" data-empty="1" hidden>
     <div id="months"></div>
+    <button class="more" id="btnAllMonths" hidden></button>
+  </section>
+
+  <section id="typesSec" data-tab="sessions">
+    <h2>Цена кВт·ч по типу зарядки</h2>
+    <div class="card types" id="types"></div>
   </section>
 
   <section data-tab="sessions">
@@ -264,11 +296,6 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
       <div class="cardhead"><span class="muted" style="font-size:13px">По пробегу и датам</span><button class="link-btn" id="btnRem">Добавить</button></div>
       <div id="remList"></div>
     </div>
-  </section>
-
-  <section id="f2fSec" data-tab="overview" hidden>
-    <h2>Точный расход</h2>
-    <div class="card" id="f2f"></div>
   </section>
 
   <section data-tab="sessions">
@@ -454,7 +481,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.7";
+const APP_VERSION = "1.0.8";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -582,7 +609,7 @@ function computeStats(){
     // real range on a full battery: needs the car's own kWh for every charge in the interval
     if(allBat && bat>0) rng.push({km:dist, bat, date:b.s.ts});
   }
-  return {ss,totByn,totKwh,rKwh,rByn,paidAvg,freeKwh,saved,odoNow,km,Rr,pending,early,pKwh,pByn,kmR,paidMax,paidMin,paid,byType,free,f:{kwh:fKwh,byn:fByn,km:fKm,n:fN,rng}};
+  return {ss,totByn,totKwh,rKwh,rByn,paidAvg,freeKwh,saved,odoNow,km,Rr,base,pending,early,pKwh,pByn,kmR,paidMax,paidMin,paid,byType,free,f:{kwh:fKwh,byn:fByn,km:fKm,n:fN,rng}};
 }
 
 /* ---------- render ---------- */
@@ -610,7 +637,7 @@ function render(){
   $("fKwh").textContent = fmt(st.totKwh,1);
   $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} ${cur()}` : "—";
   $("fSavedL").textContent = st.freeKwh>0 ? `сэкономлено на бесплатных ${fmt(st.freeKwh,0)} кВт·ч` : "сэкономлено на бесплатных зарядках";
-  const notes = [];
+  const notes = [], how = [];   // notes: in sight (actions, warnings); how: under «Как это считается»
   if(st.kmR>0 && st.paid<=0){
     // came with more range than is paid for so far (e.g. 10 km after purchase): the figures would be negative
     $("fPer100").textContent="—"; $("fCons").textContent="—";
@@ -622,12 +649,13 @@ function render(){
     const same = Math.abs(perHi-perLo)<0.05;
     $("fPer100").textContent = same ? fmt(perLo,1) : `${fmt(perLo,1)}–${fmt(perHi,1)}`;
     $("fCons").textContent = same ? fmt(cLo,1) : `${fmt(cLo,0)}–${fmt(cHi,0)}`;
-    if(st.Rr) notes.push(`Цена и расход — на ${dShort(st.Rr.t)}: ${fmtInt(st.kmR)} км пройдено плюс ${fmtInt(st.Rr.range)} км запаса в батарее${S.settings.startRange!=null?` минус ${fmtInt(S.settings.startRange)} км запаса в начале учёта`:""}. Расход по счётчикам станций, с потерями на зарядку.`);
+    if(st.Rr){ const n=st.base.filter(s=>!glitch(s)).length; notes.push(`Цифры на ${dShort(st.Rr.t)}, по ${n} ${plural(n,"зарядке","зарядкам","зарядкам")}, с потерями на зарядку.`); }
+    if(st.Rr) how.push(`Цена и расход — на ${dShort(st.Rr.t)}: ${fmtInt(st.kmR)} км пройдено плюс ${fmtInt(st.Rr.range)} км запаса в батарее${S.settings.startRange!=null?` минус ${fmtInt(S.settings.startRange)} км запаса в начале учёта`:""}. Расход по счётчикам станций, с потерями на зарядку.`);
     else notes.push("Запас хода ещё не указан — расход посчитан только по пройденным километрам и завышен.");
     if(st.early.length) notes.push(`${st.early.length} ${plural(st.early.length,"зарядка","зарядки","зарядок")} раньше начала учёта (${dShort(pd)}) не ${st.early.length===1?"входит":"входят"} в цену и расход — их километры не учтены.`);
     if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
   } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
-  if(st.paidAvg!=null && st.freeKwh>0) notes.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} ${cur()}/кВт·ч — по этой цене считается экономия.`);
+  if(st.paidAvg!=null && st.freeKwh>0) how.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} ${cur()}/кВт·ч — по этой цене считается экономия.`);
   // under the meter: this month's charging and the running cost of the car
   const now=new Date(), mKey=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
   const mS=S.sessions.filter(x=>x.ts.slice(0,7)===mKey && !glitch(x));
@@ -638,10 +666,18 @@ function render(){
   const withBat=S.sessions.filter(x=>x.kwhBat&&x.kwh);
   if(withBat.length){
     const w=withBat.reduce((a,x)=>a+x.kwh,0), b=withBat.reduce((a,x)=>a+x.kwhBat,0);
-    notes.push(`Потери при зарядке по замерам (${withBat.length} ${plural(withBat.length,"зарядка","зарядки","зарядок")}) — ${fmt((w/b-1)*100,1)}%.`);
+    how.push(`Потери при зарядке по замерам (${withBat.length} ${plural(withBat.length,"зарядка","зарядки","зарядок")}) — ${fmt((w/b-1)*100,1)}%.`);
   }
-  if(S.settings.carCons && st.paid>0) notes.push(`Бортовой компьютер показывал ${fmt(S.settings.carCons,1)} кВт·ч/100 км — это расход без потерь на зарядку.`);
-  const pn=$("perNote"); pn.innerHTML=""; notes.forEach(t=>{ const e=document.createElement("p"); e.textContent=t; pn.appendChild(e); });
+  if(S.settings.carCons && st.paid>0) how.push(`Бортовой компьютер показывал ${fmt(S.settings.carCons,1)} кВт·ч/100 км — это расход без потерь на зарядку.`);
+  const pn=$("perNote"); pn.innerHTML="";
+  const para=(box,t)=>{ const e=document.createElement("p"); e.textContent=t; box.appendChild(e); };
+  notes.forEach(t=>para(pn,t));
+  if(how.length){
+    const b=document.createElement("button"); b.type="button"; b.className="link-btn"; b.id="btnHow";
+    b.textContent=showHow?"Как это считается ▴":"Как это считается ▾"; b.setAttribute("aria-expanded",showHow);
+    b.addEventListener("click",()=>{ showHow=!showHow; render(); }); pn.appendChild(b);
+    const box=document.createElement("div"); box.id="howNotes"; box.hidden=!showHow; how.forEach(t=>para(box,t)); pn.appendChild(box);
+  }
 
   const Rr=st.Rr;
   $("odoNow").textContent = st.odoNow>0 ? `${fmtInt(st.odoNow)} км${Rr?`, запас ${fmtInt(Rr.range)} км${Rr.odo<st.odoNow?` (на ${fmtInt(Rr.odo)} км)`:""}`:""}` : "не указан";
@@ -668,17 +704,22 @@ function render(){
   renderReminders(st);
 
   // full-to-full
-  if(st.f.n>0){ $("f2fSec").dataset.empty="0"; $("f2fSec").hidden = tab!=="overview";
+  showIf($("f2fSec"), st.f.n>0);
+  if(st.f.n>0){
     const cap = S.settings.capKwh, R=st.f.rng;
-    let rangeHtml = `<p class="mnote">Реальный запас на полном заряде появится, когда в полных зарядках будет заполнено «Приняла машина, кВт·ч».</p>`;
-    if(R.length && !cap) rangeHtml = `<p class="mnote">Укажите в настройках полезную ёмкость батареи — появится реальный запас хода на полном заряде.</p>`;
+    const consHtml = `<b>${fmt(st.f.kwh/st.f.km*100,1)} кВт·ч</b> и <b>${fmt(st.f.byn/st.f.km*100,1)} ${cur()}</b> на 100 км <span class="muted">— точный расход от полного до полного, ${st.f.n} ${plural(st.f.n,"интервал","интервала","интервалов")}, ${fmtInt(st.f.km)} км</span>`;
+    let html = `<div>${consHtml}</div><p class="mnote">Реальный запас на полном заряде появится, когда в полных зарядках будет заполнено «Приняла машина, кВт·ч».</p>`;
+    if(R.length && !cap) html = `<div>${consHtml}</div><p class="mnote">Укажите в настройках полезную ёмкость батареи — появится реальный запас хода на полном заряде.</p>`;
     if(R.length && cap){
       const last=R[R.length-1], lastR=cap*last.km/last.bat;
       const allKm=R.reduce((a,x)=>a+x.km,0), allBat=R.reduce((a,x)=>a+x.bat,0), avgR=cap*allKm/allBat;
-      rangeHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><b style="font-size:20px">≈${fmtInt(lastR)} км</b><div class="muted" style="font-size:13px">реальный запас на полном заряде — по последнему интервалу (${fmtInt(last.km)} км, машина приняла ${fmt(last.bat,1)} кВт·ч, ${fmt(last.bat/last.km*100,1)} кВт·ч/100 км без потерь на зарядку)${R.length>1?`. В среднем по ${R.length} интервалам — ≈${fmtInt(avgR)} км`:""}. Считается от полезной ёмкости ${fmt(cap,1)} кВт·ч.</div></div>`;
+      html = `<div class="muted" style="font-size:13px">Реальный запас на полном заряде</div>
+        <div><span class="f2f-big">≈${fmtInt(lastR)} км</span>${R.length>1?` <span class="muted" style="font-size:13px">в среднем ≈${fmtInt(avgR)} км</span>`:""}</div>
+        <p class="mnote" style="margin-top:4px">По последнему интервалу: ${fmtInt(last.km)} км, машина приняла ${fmt(last.bat,1)} кВт·ч (${fmt(last.bat/last.km*100,1)} кВт·ч/100 км без потерь на зарядку); реальный запас считается от полезной ёмкости ${fmt(cap,1)} кВт·ч.</p>
+        <div class="f2f-cons">${consHtml}</div>`;
     }
-    $("f2f").innerHTML = `<div class="odo-row"><div><b>${fmt(st.f.kwh/st.f.km*100,1)} кВт·ч</b> <span class="muted">и</span> <b>${fmt(st.f.byn/st.f.km*100,1)} ${cur()}</b><div class="muted" style="font-size:13px">на 100 км, по ${st.f.n} ${plural(st.f.n,"интервалу","интервалам","интервалам")} от полного до полного, ${fmtInt(st.f.km)} км</div></div></div>` + rangeHtml;
-  } else { $("f2fSec").dataset.empty="1"; $("f2fSec").hidden=true; }
+    $("f2f").innerHTML = html;
+  }
 
   renderList(st.ss);
 
@@ -875,11 +916,49 @@ function delta(cur,prev,lowerIsGood,d=1){
   const good = lowerIsGood ? diff<0 : diff>0;
   return `<span class="delta ${good?"good":"bad"}">${diff>0?"▲":"▼"}${fmt(Math.abs(diff),d)}</span>`;
 }
+const MONTH_SHORT=["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+const CHART={
+  per100:{pill:()=>`${cur()}/100 км`, unit:()=>`${cur()} на 100 км`, d:1, approx:true, get:M=>M.per100},
+  cons:{pill:()=>"кВт·ч/100 км", unit:()=>"кВт·ч на 100 км", d:1, approx:true, get:M=>M.cons},
+  spent:{pill:()=>"Потрачено", unit:()=>`${cur()} на зарядки`, d:2, approx:false, get:M=>M.byn},
+};
+let chartMetric="per100", chartSel=null, chartLen=0, showAllMonths=false, showHow=false;
+function showIf(sec,on){ sec.dataset.empty=on?"0":"1"; sec.hidden=!on||tab!==sec.dataset.tab; }
+function renderChart(ms,st){
+  showIf($("chartSec"), ms.some(M=>M.byn>0));
+  if(!ms.length) return;
+  const last=ms.slice(-12), cfg=CHART[chartMetric];
+  if(chartSel==null||last.length!==chartLen) chartSel=last.length-1;   // new data (or a new month): back to the current month
+  chartLen=last.length;
+  // reference line: the whole period for per-km figures, the average full month for spending
+  let ref=null, refText="";
+  if(chartMetric!=="spent" && st.kmR>0 && st.paid>0){ ref=(chartMetric==="per100"?st.pByn:st.pKwh)/st.paid*100; refText=`всего ${fmt(ref,1)}`; }
+  if(chartMetric==="spent"){ const full=last.filter(M=>!M.partial); if(full.length){ ref=full.reduce((a,M)=>a+M.byn,0)/full.length; refText=`в среднем ${fmt(ref,0)}`; } }
+  const vals=last.map(cfg.get), H=150, many=last.length>6;
+  const max=Math.max(ref||0, ...vals.filter(v=>v!=null), 0.01);
+  const label=(v,M,d)=>v==null?"—":(cfg.approx&&!M.exact?"≈":"")+fmt(v,d);
+  const name=M=>{ const n=new Date(M.y,M.m,1).toLocaleDateString("ru-RU",{month:"long",year:"numeric"}).replace(/\s*г\.$/,""); return n[0].toUpperCase()+n.slice(1); };
+  $("chartPills").innerHTML=Object.keys(CHART).map(k=>`<button type="button" data-k="${k}" aria-pressed="${k===chartMetric}">${CHART[k].pill()}</button>`).join("");
+  $("chartArea").style.setProperty("--gap", many?"5px":"14px"); $("chartLabels").style.setProperty("--gap", many?"5px":"14px");
+  $("chartArea").innerHTML=(ref!=null?`<div class="chart-ref" style="bottom:${Math.round(ref/max*H)}px"><span>${refText}</span></div>`:"")
+    +`<div class="chart-bars">`+last.map((M,i)=>{ const v=vals[i], sel=i===chartSel;
+      return `<button type="button" data-i="${i}" class="${sel?"sel":""} ${M.partial?"partial":""}" aria-pressed="${sel}" aria-label="${name(M)}: ${label(v,M,cfg.d)} ${cfg.unit()}">${!many||sel?`<small>${label(v,M,chartMetric==="spent"?0:cfg.d)}</small>`:""}<i style="height:${v?Math.max(2,Math.round(v/max*H)):0}px"></i></button>`; }).join("")+`</div>`;
+  $("chartLabels").innerHTML=last.map(M=>`<span>${MONTH_SHORT[M.m]}</span>`).join("");
+  const M=last[chartSel], v=vals[chartSel];
+  $("chartSel").innerHTML=`<b>${name(M)}${M.partial?" · идёт":""}</b> <span>${v==null?"нет данных: мало километров за месяц":`${label(v,M,cfg.d)} ${cfg.unit()}${cfg.approx&&!M.exact?" — приблизительно: в начале или конце месяца не указан запас хода":""}`}</span>`;
+}
+$("chartPills").addEventListener("click",e=>{ const b=e.target.closest("button[data-k]"); if(b){ chartMetric=b.dataset.k; render(); } });
+$("chartArea").addEventListener("click",e=>{ const b=e.target.closest("button[data-i]"); if(b){ chartSel=Number(b.dataset.i); render(); } });
+$("btnAllMonths").addEventListener("click",()=>{ showAllMonths=!showAllMonths; render(); });
 function renderMonths(st){
   const el=$("months"); const ms=monthStats();
-  if(!ms.length){ el.innerHTML=""; return; }
+  renderChart(ms,st);
+  showIf($("monthsSec"), ms.length>0);
   el.innerHTML="";
+  const all=$("btnAllMonths"); all.hidden=ms.length<=2;
+  all.textContent=showAllMonths?"Свернуть":`Все месяцы (${ms.length})`;
   ms.slice().reverse().forEach((M,i,arr)=>{
+    if(!showAllMonths && i>=2) return;
     const P=arr[i+1]||null;
     const name=new Date(M.y,M.m,1).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
     const d=document.createElement("div"); d.className="month";
@@ -933,7 +1012,7 @@ function setTab(t){
   $("tabs").querySelectorAll("button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
   document.querySelectorAll("section[data-tab],.tabbed[data-tab]").forEach(el=>{
     const on = el.dataset.tab===t;
-    if(el.id==="f2fSec"){ el.hidden = !on || el.dataset.empty==="1"; }
+    if(el.dataset.empty!==undefined){ el.hidden = !on || el.dataset.empty==="1"; }
     else el.hidden = !on;
   });
   $("btnAdd").textContent=FAB[t][0];

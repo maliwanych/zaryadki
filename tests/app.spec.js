@@ -383,6 +383,7 @@ test("настройка «Начало учёта»: км и цена счит�
 test("месяц: доля дешёвых — по настоящей цене, без «Ночью»", async ({ page }) => {
   await page.goto("./");
   await importBackup(page);
+  await page.click("#btnAllMonths");
   const aug = page.locator(".month", { hasText: "Август 2026" });
   // платные: 76,65 BYN за 125 кВт·ч = 0,61 в среднем; дешевле — 35 и 20 кВт·ч, плюс 90 бесплатных: 145 из 215 = 67%
   await expect(aug).toContainText("Дешевле вашей средней цены 0,61 BYN/кВт·ч: 67%");
@@ -561,6 +562,7 @@ test("зарядки раньше начала учёта не входят в �
 test("доля дешёвых в прошлом месяце не меняется от новых зарядок", async ({ page }) => {
   await page.goto("./");
   await importBackup(page);
+  await page.click("#btnAllMonths");
   const aug = page.locator(".month", { hasText: "Август 2026" });
   await expect(aug).toContainText("Дешевле вашей средней цены 0,61 BYN/кВт·ч: 67%");
   const savedBefore = await aug.innerText();
@@ -611,6 +613,56 @@ test("пример не пропадает, если открыть прилож
   await page.reload();
   await expect(page.locator("#welcome")).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("ev-tracker-demo"))).toBeNull();
+});
+
+test.describe("новый «Обзор»", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnDemo");
+    await expect(page.locator("#demoBanner")).toBeVisible();
+  });
+
+  test("порядок блоков, а цена по типу зарядки — во вкладке «Зарядки»", async ({ page }) => {
+    const order = await page.evaluate(() => [...document.querySelectorAll("main > section")].filter(s => !s.hidden).map(s => s.id));
+    expect(order).toEqual(["odoSec", "f2fSec", "chartSec", "monthsSec"]);
+    await expect(page.locator("#types")).toBeHidden();
+    await page.click("[data-tab=sessions]");
+    await expect(page.locator("#types")).toBeVisible();
+  });
+
+  test("под цифрами одна строка, подробности — по кнопке «Как это считается»", async ({ page }) => {
+    await expect(page.locator("#perNote")).toContainText("Цифры на");
+    await expect(page.locator("#howNotes")).toBeHidden();
+    await page.click("#btnHow");
+    await expect(page.locator("#howNotes")).toBeVisible();
+    await expect(page.locator("#howNotes")).toContainText("Расход по счётчикам станций");
+  });
+
+  test("график по месяцам: метрика, выбор месяца, линия «всего»", async ({ page }) => {
+    const bars = page.locator("#chartArea .chart-bars button");
+    expect(await bars.count()).toBeGreaterThanOrEqual(4);
+    await expect(page.locator("#chartPills button[aria-pressed=true]")).toHaveText("BYN/100 км");
+    await expect(page.locator("#chartSel")).toContainText("идёт");            // по умолчанию — текущий месяц
+    await expect(page.locator("#chartArea .chart-ref")).toContainText("всего");
+    const first = (await bars.first().getAttribute("aria-label")).split(":")[0];
+    await bars.first().click();
+    await expect(page.locator("#chartSel")).toContainText(first);
+    await expect(page.locator("#chartSel")).toContainText("BYN на 100 км");
+    await page.click("#chartPills button:has-text('Потрачено')");
+    await expect(page.locator("#chartSel")).toContainText(first);             // выбранный месяц остаётся
+    await expect(page.locator("#chartSel")).toContainText("BYN на зарядки");
+    await expect(page.locator("#chartArea .chart-ref")).toContainText("в среднем");
+  });
+
+  test("показаны два последних месяца, остальные — по кнопке", async ({ page }) => {
+    await expect(page.locator(".month")).toHaveCount(2);
+    const all = page.locator("#btnAllMonths");
+    const n = Number((await all.textContent()).match(/\d+/)[0]);
+    expect(n).toBeGreaterThanOrEqual(4);
+    await all.click();
+    await expect(page.locator(".month")).toHaveCount(n);
+    await expect(all).toHaveText("Свернуть");
+  });
 });
 
 test("версия совпадает в index.html, sw.js и package.json", () => {
