@@ -616,7 +616,7 @@ function computeStats(){
 function render(){
   const st = computeStats();
   const pd = new Date(S.settings.purchaseDate+"T00:00");
-  $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"});
+  $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}).replace(/\s(г\.)$/,"\u00a0$1");   // «г.» never on a line of its own
   $("carName").textContent = S.settings.carName || "Мой электромобиль";
   document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
   $("welcome").hidden = S.configured || DEMO;
