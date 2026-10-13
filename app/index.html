@@ -444,7 +444,8 @@ const fmtInt = n => Math.round(n).toLocaleString("ru-RU");
 const pad = n => String(n).padStart(2,"0");
 const nowLocal = () => { const d=new Date(); return `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const cssv = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-const cur = () => CURRENCIES[S.settings.currency] || "BYN";
+const curCode = c => Object.prototype.hasOwnProperty.call(CURRENCIES,c) ? c : "BYN";
+const cur = () => CURRENCIES[curCode(S.settings.currency)];
 const glitch = s => (s.kwh||0) < 1;
 const isFree = s => !glitch(s) && (s.byn||0)===0;
 const plural = (n,a,b,c) => { const m10=n%10, m100=n%100; return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20))?b:c; };
@@ -453,10 +454,11 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.6";
+const APP_VERSION = "1.0.7";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
+const DEMO_AT = DEMO_KEY+"-at";
 const DEMO = (()=>{ try{ return sessionStorage.getItem(DEMO_KEY)==="1" && localStorage.getItem(DEMO_KEY)!==null; }catch(e){ return false; } })();
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
@@ -554,8 +556,11 @@ function computeStats(){
   // latest reading with a known range (not the purchase itself) is the anchor for cost per km
   const RR = RD.filter(x=>x.range!=null && x.t>purchaseT);
   const Rr = RR.length ? RR[RR.length-1] : null;
-  const base = Rr ? ss.filter(s=>inBefore(s,Rr)) : ss;
-  const pending = Rr ? ss.filter(s=>!inBefore(s,Rr) && !glitch(s)) : [];
+  // charges dated before the start of tracking: their km aren't in kmR, so they stay out of the per-km figures
+  const counted = s => s.ts.slice(0,10) >= S.settings.purchaseDate;
+  const early = ss.filter(s=>!counted(s) && !glitch(s));
+  const base = (Rr ? ss.filter(s=>inBefore(s,Rr)) : ss).filter(counted);
+  const pending = Rr ? ss.filter(s=>counted(s) && !inBefore(s,Rr) && !glitch(s)) : [];
   const pKwh = base.reduce((a,s)=>a+(s.kwh||0),0), pByn = base.reduce((a,s)=>a+(s.byn||0),0);
   const kmR = Rr ? Rr.odo - startOdo : km;
   const paidMax = kmR + (Rr ? Rr.range : 0);                 // car came empty
@@ -577,7 +582,7 @@ function computeStats(){
     // real range on a full battery: needs the car's own kWh for every charge in the interval
     if(allBat && bat>0) rng.push({km:dist, bat, date:b.s.ts});
   }
-  return {ss,totByn,totKwh,rKwh,rByn,paidAvg,freeKwh,saved,odoNow,km,Rr,pending,pKwh,pByn,kmR,paidMax,paidMin,paid,byType,free,f:{kwh:fKwh,byn:fByn,km:fKm,n:fN,rng}};
+  return {ss,totByn,totKwh,rKwh,rByn,paidAvg,freeKwh,saved,odoNow,km,Rr,pending,early,pKwh,pByn,kmR,paidMax,paidMin,paid,byType,free,f:{kwh:fKwh,byn:fByn,km:fKm,n:fN,rng}};
 }
 
 /* ---------- render ---------- */
@@ -619,6 +624,7 @@ function render(){
     $("fCons").textContent = same ? fmt(cLo,1) : `${fmt(cLo,0)}–${fmt(cHi,0)}`;
     if(st.Rr) notes.push(`Цена и расход — на ${dShort(st.Rr.t)}: ${fmtInt(st.kmR)} км пройдено плюс ${fmtInt(st.Rr.range)} км запаса в батарее${S.settings.startRange!=null?` минус ${fmtInt(S.settings.startRange)} км запаса в начале учёта`:""}. Расход по счётчикам станций, с потерями на зарядку.`);
     else notes.push("Запас хода ещё не указан — расход посчитан только по пройденным километрам и завышен.");
+    if(st.early.length) notes.push(`${st.early.length} ${plural(st.early.length,"зарядка","зарядки","зарядок")} раньше начала учёта (${dShort(pd)}) не ${st.early.length===1?"входит":"входят"} в цену и расход — их километры не учтены.`);
     if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
   } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
   if(st.paidAvg!=null && st.freeKwh>0) notes.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} ${cur()}/кВт·ч — по этой цене считается экономия.`);
@@ -833,7 +839,7 @@ function odoAt(r,t){
   for(let i=0;i<r.length-1;i++){ const a=r[i],b=r[i+1]; if(t>=a.t&&t<b.t){ const k=(t-a.t)/(b.t-a.t||1); return a.odo+(b.odo-a.odo)*k; } }
   return L.odo;
 }
-function monthStats(paidAvg){
+function monthStats(){
   const r=RD; const purchase=new Date(S.settings.purchaseDate+"T00:00"); const now=new Date();
   const out=[]; let y=purchase.getFullYear(), m=purchase.getMonth();
   while(new Date(y,m,1)<=now){
@@ -852,11 +858,14 @@ function monthStats(paidAvg){
         cons=inn.reduce((a,s)=>a+(s.kwh||0),0)/paid*100; per100=inn.reduce((a,s)=>a+(s.byn||0),0)/paid*100; exact=true; } }
     if(cons===null&&km>50){ cons=kwh/km*100; per100=byn/km*100; }
     const mix={hwy:0,dc:0,ac:0,free:0}; real.forEach(s=>mix[mixCat(s)]+=s.kwh);
-    const cheapKwh=paidAvg ? real.filter(s=>isFree(s)||s.byn/s.kwh<paidAvg).reduce((a,s)=>a+s.kwh,0) : 0;
-    const saved=paidAvg?mix.free*paidAvg:0;
+    // average paid price as of the end of this month, so later charges don't rewrite past months
+    const paidSoFar=S.sessions.filter(s=>!glitch(s)&&!isFree(s)&&new Date(s.ts)<end);
+    const pk=paidSoFar.reduce((a,s)=>a+s.kwh,0), avg=pk?paidSoFar.reduce((a,s)=>a+s.byn,0)/pk:null;
+    const cheapKwh=avg ? real.filter(s=>isFree(s)||s.byn/s.kwh<avg).reduce((a,s)=>a+s.kwh,0) : 0;
+    const saved=avg?mix.free*avg:0;
     const partial=end>now;
     const costs=S.costs.reduce((a,c)=>a+costInRange(c,start,to),0);
-    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,cheapKwh,partial,costs,saved});
+    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,cheapKwh,avg,partial,costs,saved});
     m++; if(m>11){m=0;y++;}
   }
   return out;
@@ -867,7 +876,7 @@ function delta(cur,prev,lowerIsGood,d=1){
   return `<span class="delta ${good?"good":"bad"}">${diff>0?"▲":"▼"}${fmt(Math.abs(diff),d)}</span>`;
 }
 function renderMonths(st){
-  const el=$("months"); const ms=monthStats(st.paidAvg);
+  const el=$("months"); const ms=monthStats();
   if(!ms.length){ el.innerHTML=""; return; }
   el.innerHTML="";
   ms.slice().reverse().forEach((M,i,arr)=>{
@@ -892,7 +901,7 @@ function renderMonths(st){
         <div><b>${fmt(M.kwh,1)}</b><small>кВт·ч, ${M.n} ${plural(M.n,"зарядка","зарядки","зарядок")}</small></div>
         <div><b>${M.saved?`≈${fmt(M.saved,0)} ${cur()}`:"—"}</b><small>сэкономлено на бесплатных</small></div>
       </div>
-      ${mixTot?`<div class="mix">${st.paidAvg?`<small class="muted" style="font-size:12px">Дешевле вашей средней цены ${fmt(st.paidAvg)} ${cur()}/кВт·ч: ${fmt(M.cheapKwh/mixTot*100,0)}%</small>`:""}<div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
+      ${mixTot?`<div class="mix">${M.avg?`<small class="muted" style="font-size:12px">Дешевле вашей средней цены ${fmt(M.avg)} ${cur()}/кВт·ч: ${fmt(M.cheapKwh/mixTot*100,0)}%</small>`:""}<div class="mixbar" style="margin-top:4px">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
       ${notes.length?`<p class="mnote">${notes.join(" ")}</p>`:""}`;
     el.appendChild(d);
   });
@@ -940,8 +949,10 @@ $("formSess").addEventListener("submit",async e=>{
   const f=e.target; const kwh=num(f.kwh.value), byn=num(f.byn.value);
   if(kwh===null||kwh<0){ toast("Укажите, сколько кВт·ч заряжено"); f.kwh.focus(); return; }
   if(byn===null||byn<0){ toast(`Укажите сумму в ${cur()}`); f.byn.focus(); return; }
-  const doc = { ...kept(S.sessions,editingId), ts:f.ts.value, station:f.station.value.trim(), kwh, byn, type:curType,
-    odo:num(f.odo.value), socTo:num(f.socTo.value), kwhBat:num(f.kwhBat.value) };
+  const prev=kept(S.sessions,editingId), socTo=num(f.socTo.value);
+  if(prev.socFrom!=null && socTo!==prev.socTo) delete prev.socFrom;   // «20→80%» from the old tracker: a new end makes the old start meaningless
+  const doc = { ...prev, ts:f.ts.value, station:f.station.value.trim(), kwh, byn, type:curType,
+    odo:num(f.odo.value), socTo, kwhBat:num(f.kwhBat.value) };
   const btn=$("btnSaveSess"); btn.disabled=true;
   try{
     const ref = editingId ? db.collection("sessions").doc(editingId) : db.collection("sessions").doc();
@@ -976,7 +987,7 @@ $("formOdo").addEventListener("submit",async e=>{
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
-function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=CURRENCIES[S.settings.currency]?S.settings.currency:"BYN";
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency);
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
   if(u) b.dataset.label=`Вернуть данные до загрузки копии (${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})})`;
   disarm(b); $("dlgSet").showModal(); }
@@ -1122,7 +1133,7 @@ $("fileImport").addEventListener("change",async e=>{
   put("odo",data.odo,["odo","range"]); put("refunds",data.refunds,["byn"]);
   put("costs",data.costs,["byn","odo","periodMonths","lifeKm"]); put("reminders",data.reminders,["everyKm","lastOdo","everyMonths"]);
   const settings=cleanRecord(data.settings,["startOdo","startRange","capKwh","carCons"]);
-  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; if(!CURRENCIES[settings.currency]) delete settings.currency; docs["meta/settings"]=settings; }
+  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; if(curCode(settings.currency)!==settings.currency) delete settings.currency; docs["meta/settings"]=settings; }
   const current=cleanRecord(data.current,["odo","range"]);
   if(current) docs["meta/current"]=current;
   docs["meta/backup"]={date:data.exportedAt||new Date().toISOString()};
@@ -1187,7 +1198,7 @@ function iosHint(){
   try{ off=localStorage.getItem(IOS_HINT_KEY)==="1"; }catch(e){}
   el.hidden = !isIOS || isStandalone() || off;
   if(el.hidden) return;
-  const has=S.sessions.length||S.costs.length||S.reminders.length||S.odoLog.length;
+  const has=!DEMO && (S.sessions.length||S.costs.length||S.reminders.length||S.odoLog.length);
   $("iosText").textContent="Установите приложение: кнопка «Поделиться» → На экран «Домой», и открывайте его с иконки. У Safari и у иконки разные хранилища: записи, внесённые здесь, в приложении с иконки не появятся."
     +(has?" Здесь уже есть записи — сохраните резервную копию и загрузите её в приложении с иконки.":"");
 }
@@ -1200,7 +1211,7 @@ function demoDocs(now){
   const at=(d,h,m=0)=>{ const t=new Date(start); t.setDate(t.getDate()+d); t.setHours(h,m,0,0); return t; };
   const odoAt=(d,h)=>Math.round(4200+(d+h/24)*44);                     // ~44 km a day
   const docs={
-    "meta/settings":{carName:"Geely EX5 (пример)", purchaseDate:localDate(start), startOdo:4200, startRange:380, capKwh:60, carCons:15.5, currency:"BYN"},
+    "meta/settings":{carName:"Электромобиль (пример)", purchaseDate:localDate(start), startOdo:4200, startRange:380, capKwh:60, carCons:15.5, currency:"BYN"},
     "meta/backup":{date:now.toISOString()},
   };
   const PLAN=[["Дом","ac",0.25,23,30],["Работа","ac",0,10,18],["ТЦ","dc",0.69,18,32],["Дом","ac",0.25,23,28]];
@@ -1224,11 +1235,11 @@ function demoDocs(now){
   return docs;
 }
 $("btnDemo").addEventListener("click",()=>{
-  try{ localStorage.setItem(DEMO_KEY, JSON.stringify({schema:1, docs:demoDocs(new Date())})); sessionStorage.setItem(DEMO_KEY,"1"); }
+  try{ localStorage.setItem(DEMO_KEY, JSON.stringify({schema:1, docs:demoDocs(new Date())})); localStorage.setItem(DEMO_AT, String(Date.now())); sessionStorage.setItem(DEMO_KEY,"1"); }
   catch(e){ toast("Не получилось открыть пример"); return; }
   location.reload();
 });
-$("btnDemoExit").addEventListener("click",()=>{ try{ localStorage.removeItem(DEMO_KEY); sessionStorage.removeItem(DEMO_KEY); }catch(e){} location.reload(); });
+$("btnDemoExit").addEventListener("click",()=>{ try{ localStorage.removeItem(DEMO_KEY); localStorage.removeItem(DEMO_AT); sessionStorage.removeItem(DEMO_KEY); }catch(e){} location.reload(); });
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){
@@ -1247,7 +1258,8 @@ render();
 (()=>{
   db = LocalDB(DEMO ? DEMO_KEY : DB_KEY);
   $("demoBanner").hidden = !DEMO;
-  if(!DEMO) try{ localStorage.removeItem(DEMO_KEY); }catch(e){}   // left over when the app was closed inside the example
+  // left over when the app was closed inside the example; younger ones may belong to another open tab
+  if(!DEMO) try{ if(!(Date.now()-Number(localStorage.getItem(DEMO_AT))<864e5)){ localStorage.removeItem(DEMO_KEY); localStorage.removeItem(DEMO_AT); } }catch(e){}
   downloads = { save: saveFile };
   $("btnAdd").disabled=false; $("btnCsv").hidden=false; $("btnJson").hidden=false;
   $("appVer").textContent = APP_VERSION;

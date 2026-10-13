@@ -452,9 +452,9 @@ test("валюта ₽: все подписи меняются, суммы те 
   expect(JSON.parse(fs.readFileSync(await download.path(), "utf8")).settings.currency).toBe("RUB");
 });
 
-test("валюта: непонятное значение в копии — BYN", async ({ page }) => {
+for (const bad of ["USD", "constructor"]) test(`валюта: непонятное значение в копии (${bad}) — BYN`, async ({ page }) => {
   await page.goto("./");
-  await importJson(page, { settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0, currency: "USD" }, sessions: [{ id: "s1", ts: "2026-08-03T18:40", kwh: 30, byn: 19.5, type: "dc" }] });
+  await importJson(page, { settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0, currency: bad }, sessions: [{ id: "s1", ts: "2026-08-03T18:40", kwh: 30, byn: 19.5, type: "dc" }] });
   await expect(page.locator("#fKwh")).toHaveText("30,0");
   await expect(page.locator(".reg-unit")).toHaveText("BYN");
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs["meta/settings"]);
@@ -478,7 +478,7 @@ test.describe("пример с данными", () => {
     await page.click("#btnDemo");
     await expect(page.locator("#demoBanner")).toBeVisible();
     await expect(page.locator("#welcome")).toBeHidden();
-    await expect(page.locator("#carName")).toContainText("пример");
+    await expect(page.locator("#carName")).toHaveText("Электромобиль (пример)"); // без марки: ёмкость в примере условная
     expect(num(await page.locator("#fPer100").textContent())).toBeGreaterThan(0);
     expect(num(await page.locator("#fCons").textContent())).toBeGreaterThan(5);
     await expect(page.locator("#f2fSec")).toBeVisible();          // точный расход и реальный запас
@@ -530,6 +530,87 @@ test.describe("пример с данными", () => {
     await expect(page.locator("#fKwh")).toHaveText("20,0");
     expect(await stored(page, "ev-tracker")).toBe(mine);
   });
+});
+
+test("зарядки раньше начала учёта не входят в цену и расход на 100 км", async ({ page }) => {
+  // попробовал приложение неделю назад, а начало учёта поставил на сегодня
+  await page.goto("./");
+  await page.click("#btnAdd");
+  await page.fill("#formSess [name=ts]", "2026-01-05T12:00");
+  await page.fill("#formSess [name=kwh]", "40");
+  await page.fill("#formSess [name=byn]", "30");
+  await page.click("#btnSaveSess");
+  await page.click("#btnStart");
+  await page.fill("#formSet [name=startOdo]", "20000");
+  await page.fill("#formSet [name=startRange]", "300");
+  await page.click("#formSet button[type=submit]");
+  await page.click("#btnAdd");
+  await page.fill("#formSess [name=kwh]", "30");
+  await page.fill("#formSess [name=byn]", "15");
+  await page.click("#btnSaveSess");
+  await page.click("#btnOdo");
+  await page.fill("#formOdo [name=odo]", "20200");
+  await page.fill("#formOdo [name=range]", "350");
+  await page.click("#formOdo button[type=submit]");
+  await expect(page.locator("#fPer100")).toHaveText("6,0");                 // только сегодняшняя: 15 BYN на 250 км
+  await expect(page.locator("#fCons")).toHaveText("12,0");
+  await expect(page.locator("#perNote")).toContainText("1 зарядка раньше начала учёта");
+  expect(num(await page.locator("#regByn").getAttribute("aria-label"))).toBeCloseTo(45, 2); // а в «Потрачено» — обе
+});
+
+test("доля дешёвых в прошлом месяце не меняется от новых зарядок", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page);
+  const aug = page.locator(".month", { hasText: "Август 2026" });
+  await expect(aug).toContainText("Дешевле вашей средней цены 0,61 BYN/кВт·ч: 67%");
+  const savedBefore = await aug.innerText();
+  await page.click("#btnAdd"); // дорогая зарядка сейчас поднимает среднюю цену
+  await page.fill("#formSess [name=station]", "Дорогая");
+  await page.fill("#formSess [name=kwh]", "50");
+  await page.fill("#formSess [name=byn]", "60");
+  await page.click("#btnSaveSess");
+  await expect(page.locator("#fKwh")).toHaveText("265,3");
+  expect(await aug.innerText()).toBe(savedBefore);
+});
+
+test("правка «% после» убирает устаревший «% до» из старого трекера", async ({ page }) => {
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Проверка", purchaseDate: "2026-08-01", startOdo: 0 },
+    sessions: [{ id: "s1", ts: "2026-08-03T18:40", station: "Старое", kwh: 30, byn: 19.5, type: "dc", socFrom: 20, socTo: 80 }] });
+  await page.click("[data-tab=sessions]");
+  await page.click("#list .sess");
+  await page.fill("#formSess [name=socTo]", "100");
+  await page.click("#btnSaveSess");
+  await expect(page.locator("#list .sess .meta").first()).toContainText("до 100%");
+  await expect(page.locator("#list .sess .meta").first()).not.toContainText("20→");
+});
+
+test("пример: подсказка для iPhone не советует сохранять копию", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1", viewport: { width: 400, height: 860 } });
+  const page = await context.newPage();
+  await page.goto("./");
+  await page.click("#btnDemo");
+  await expect(page.locator("#demoBanner")).toBeVisible();
+  await expect(page.locator("#iosHint")).toBeVisible();
+  await expect(page.locator("#iosHint")).not.toContainText("копию");
+  await context.close();
+});
+
+test("пример не пропадает, если открыть приложение во второй вкладке; давние остатки убираются", async ({ page, context }) => {
+  await page.goto("./");
+  await page.click("#btnDemo");
+  await expect(page.locator("#demoBanner")).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("./");
+  await expect(second.locator("#welcome")).toBeVisible();     // во второй вкладке — свои данные
+  await page.reload();
+  await expect(page.locator("#demoBanner")).toBeVisible();     // а пример в первой на месте
+  await second.close();
+  // остатки примера старше суток (приложение закрыли внутри примера) убираются при запуске
+  await page.evaluate(() => { sessionStorage.clear(); localStorage.setItem("ev-tracker-demo-at", String(Date.now() - 2 * 864e5)); });
+  await page.reload();
+  await expect(page.locator("#welcome")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("ev-tracker-demo"))).toBeNull();
 });
 
 test("версия совпадает в index.html, sw.js и package.json", () => {
