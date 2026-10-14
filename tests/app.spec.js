@@ -688,6 +688,23 @@ test("свой список станций: появляется у поля, ф
   await expect(page.locator("#formSess [name=byn]")).toHaveValue("5,40");
 });
 
+test("список станций выпадает поверх формы: поля под ним не сдвигаются, прокрутка своя", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page);
+  await page.click("#btnAdd");
+  const kwh = page.locator("#formSess [name=kwh]");
+  const before = (await kwh.boundingBox()).y;
+  await page.locator("#formSess [name=station]").focus();
+  await expect(page.locator("#stationSug")).toBeVisible();
+  expect((await kwh.boundingBox()).y).toBe(before);                 // открыли — поля на месте
+  await page.locator("#formSess [name=station]").fill("ст");
+  expect((await kwh.boundingBox()).y).toBe(before);                 // отфильтровали — тоже
+  const css = await page.locator("#stationSug").evaluate(e => { const c = getComputedStyle(e); return { pos: c.position, overflow: c.overflowY, max: c.maxHeight }; });
+  expect(css.pos).toBe("absolute");
+  expect(css.overflow).toBe("auto");
+  expect(css.max).not.toBe("none");
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];

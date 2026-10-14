@@ -103,7 +103,8 @@ section{margin-top:28px}
 .chart-sel{background:var(--plate);border-radius:10px;padding:10px 12px;font-size:13px}
 .chart-sel span{color:var(--muted)}
 /* Station suggestions: our own list (the browser's datalist doesn't open in Edge on Android) */
-.sug{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:-6px;background:var(--field)}
+.stwrap{position:relative}
+.sug{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:3;display:flex;flex-direction:column;max-height:229px;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;background:var(--field);box-shadow:0 10px 28px rgba(0,0,0,.28)}
 .sug button{display:flex;justify-content:space-between;align-items:baseline;gap:10px;background:none;border:0;border-top:1px solid var(--line);padding:11px 12px;text-align:left;font-size:16px;min-height:44px;color:var(--ink)}
 .sug button:first-child{border-top:0}
 .sug span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -326,8 +327,10 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <h2 id="sessTitle">Новая зарядка</h2>
   <div class="fgrid">
     <label class="full">Дата и время<input type="datetime-local" name="ts" required></label>
-    <label class="full">Станция<input name="station" placeholder="Название или адрес станции" autocomplete="off" aria-autocomplete="list" aria-controls="stationSug"></label>
-    <div class="full sug" id="stationSug" role="listbox" aria-label="Ваши станции" hidden></div>
+    <div class="full stwrap">
+      <label>Станция<input name="station" placeholder="Название или адрес станции" autocomplete="off" aria-autocomplete="list" aria-controls="stationSug"></label>
+      <div class="sug" id="stationSug" role="listbox" aria-label="Ваши станции" hidden></div>
+    </div>
     <p class="hint full" id="priceHint" hidden></p>
     <label>Заряжено, кВт·ч<input name="kwh" inputmode="decimal" required placeholder="0,00"></label>
     <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required placeholder="0,00"></label>
@@ -487,7 +490,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.9";
+const APP_VERSION = "1.0.10";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1175,7 +1178,7 @@ function showStationSug(){
   const last={};
   S.sessions.forEach(s=>{ if(s.station && !glitch(s) && (!last[s.station] || s.ts>last[s.station])) last[s.station]=s.ts; });
   const names=Object.keys(last).sort((a,b)=>last[a]<last[b]?1:-1)
-    .filter(n=>!q || (n.toLowerCase().includes(q) && n.toLowerCase()!==q)).slice(0,6);
+    .filter(n=>!q || (n.toLowerCase().includes(q) && n.toLowerCase()!==q));
   box.innerHTML="";
   names.forEach(n=>{
     const p=stationPrice(n), b=document.createElement("button");
@@ -1186,7 +1189,7 @@ function showStationSug(){
     b.addEventListener("click",()=>{ f.station.value=n; box.hidden=true; applyPriceHint(); autoSum(); f.kwh.focus(); });
     box.appendChild(b);
   });
-  box.hidden=!names.length;
+  box.hidden=!names.length; box.scrollTop=0;
 }
 $("formSess").station.addEventListener("focus",showStationSug);
 $("formSess").station.addEventListener("blur",()=>{ $("stationSug").hidden=true; });
