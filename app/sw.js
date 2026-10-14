@@ -1,6 +1,6 @@
 // Service worker: makes the app open without internet and delivers updates.
 // To ship an update, change VERSION — phones will offer "Доступна новая версия".
-const VERSION = "1.0.10";
+const VERSION = "1.0.11";
 const CACHE = "zaryadki-" + VERSION;
 const SHELL = ["./", "index.html", "privacy.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png",
   "fonts/onest-cyrillic.woff2", "fonts/onest-latin.woff2", "fonts/onest-latin-ext.woff2"];

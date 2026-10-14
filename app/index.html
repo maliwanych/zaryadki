@@ -131,7 +131,8 @@ section{margin-top:28px}
 /* Sheets */
 dialog{border:0;padding:0;background:var(--panel);color:var(--ink);width:100%;max-width:560px;margin:auto auto 0;border-radius:18px 18px 0 0;max-height:92vh}
 dialog::backdrop{background:rgba(0,0,0,.45)}
-.sheet{padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;max-height:92vh}
+html.modal-open,html.modal-open body{overflow:hidden;overscroll-behavior:none}
+.sheet{padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;max-height:92vh;overscroll-behavior:contain}
 .sheet h2{margin-bottom:14px}
 .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
 .fgrid .full{grid-column:1/-1}
@@ -490,7 +491,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.10";
+const APP_VERSION = "1.0.11";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -507,7 +508,8 @@ function LocalDB(key){
   const snap=p=>{ const d=docs[p]; return {id:p.split("/").pop(), exists:d!==undefined, data:()=>d}; };
   const depth=p=>p.split("/").length;
   const colDocs=c=>Object.keys(docs).filter(k=>k.startsWith(c+"/")&&depth(k)===depth(c)+1).sort().map(snap);
-  const sub=f=>{ subs.add(f); setTimeout(f,0); return ()=>subs.delete(f); };
+  // the first snapshot comes at once: localStorage is synchronous, and a deferred one let the screen paint without data (welcome and zeros flashing)
+  const sub=f=>{ subs.add(f); f(); return ()=>subs.delete(f); };
   const doc=p=>({ id:p.split("/").pop(), path:p,
     get:async()=>snap(p),
     set:async d=>{ const prev=docs[p]; docs[p]=JSON.parse(JSON.stringify(d)); try{ save(); }catch(e){ if(prev===undefined) delete docs[p]; else docs[p]=prev; throw e; } notify(); },
@@ -628,7 +630,7 @@ function render(){
   $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}).replace(/\s(г\.)$/,"\u00a0$1");   // «г.» never on a line of its own
   $("carName").textContent = S.settings.carName || "Мой электромобиль";
   document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
-  $("welcome").hidden = S.configured || DEMO;
+  $("welcome").hidden = S.configured!==false || DEMO;
   backupNag();
   iosHint();
 
@@ -996,6 +998,9 @@ function renderMonths(st){
 /* ---------- sheets ---------- */
 document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>b.closest("dialog").close()));
 document.querySelectorAll("dialog").forEach(d=>d.addEventListener("click",e=>{ if(e.target===d) d.close(); }));
+// while any sheet is open the page behind it doesn't scroll
+const lockPage=()=>document.documentElement.classList.toggle("modal-open", !!document.querySelector("dialog[open]"));
+document.querySelectorAll("dialog").forEach(d=>new MutationObserver(lockPage).observe(d,{attributes:true,attributeFilter:["open"]}));
 function setType(t){ curType=t; $("typeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===t)); }
 $("typeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setType(b.dataset.t); });
 
@@ -1361,7 +1366,6 @@ function backupNag(){
 
 /* ---------- boot ---------- */
 setTab("overview");
-render();
 (()=>{
   db = LocalDB(DEMO ? DEMO_KEY : DB_KEY);
   $("demoBanner").hidden = !DEMO;
