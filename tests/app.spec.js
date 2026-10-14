@@ -705,6 +705,47 @@ test("список станций выпадает поверх формы: по
   expect(css.max).not.toBe("none");
 });
 
+test("при запуске ничего не мелькает: ни приветствие, ни нули вместо цифр", async ({ page }) => {
+  // настроенная машина и одна зарядка уже лежат в памяти телефона
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("seeded")) return;
+    sessionStorage.setItem("seeded", "1");
+    localStorage.setItem("ev-tracker", JSON.stringify({ schema: 1, docs: {
+      "meta/settings": { carName: "Моя", purchaseDate: "2026-08-01", startOdo: 0 },
+      "sessions/s1": { ts: "2026-08-03T18:40", station: "А", kwh: 30, byn: 19.5, type: "dc" } } }));
+  });
+  // следим за экраном с самого начала разбора страницы
+  await page.addInitScript(() => {
+    window.__flash = [];
+    new MutationObserver(() => {
+      const w = document.getElementById("welcome"), k = document.getElementById("fKwh");
+      if (w && !w.hidden) window.__flash.push("приветствие");
+      if (k && k.textContent === "0,0") window.__flash.push("нули");
+    }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  await page.goto("./");
+  await expect(page.locator("#fKwh")).toHaveText("30,0");
+  expect([...new Set(await page.evaluate(() => window.__flash))]).toEqual([]);
+});
+
+test("открытое окно блокирует страницу за ним: она не прокручивается", async ({ page }) => {
+  await page.goto("./");
+  await page.click("#btnDemo");                       // длинная страница с данными примера
+  await expect(page.locator("#demoBanner")).toBeVisible();
+  await page.click("#btnAdd");
+  await expect(page.locator("#dlgSess")).toBeVisible();
+  const before = await page.evaluate(() => window.scrollY);
+  await page.mouse.move(200, 30);                     // над затемнением, выше окна
+  await page.mouse.wheel(0, 800);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.scrollY)).toBe(before);
+  const css = await page.evaluate(() => [getComputedStyle(document.documentElement).overflow, getComputedStyle(document.querySelector("#dlgSess .sheet")).overscrollBehaviorY]);
+  expect(css).toEqual(["hidden", "contain"]);         // и прокрутка внутри окна не уходит странице
+  await page.click("#dlgSess [data-close]");
+  await page.mouse.wheel(0, 800);                     // окно закрыто — страница снова прокручивается
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
