@@ -665,6 +665,29 @@ test.describe("новый «Обзор»", () => {
   });
 });
 
+test("свой список станций: появляется у поля, фильтруется, подставляет станцию и сумму", async ({ page }) => {
+  // встроенный в браузер список (datalist) в Edge на Android не открывается, а над клавиатурой рисует пустые кружки
+  await page.goto("./");
+  await importBackup(page);
+  await page.click("#btnAdd");
+  const input = page.locator("#formSess [name=station]");
+  expect(await input.getAttribute("list")).toBeNull();
+  await expect(page.locator("#stationSug")).toBeHidden();
+  await input.focus();
+  const items = page.locator("#stationSug button");
+  await expect(items.first()).toContainText("Работа");               // последняя по времени — наверху
+  expect(await items.count()).toBe(4);                                 // все станции, кроме сбойной
+  await expect(page.locator("#stationSug")).toContainText("бесплатно");
+  await input.fill("в");                                               // без учёта регистра
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText("Станция В");
+  await items.first().click();
+  await expect(input).toHaveValue("Станция В");
+  await expect(page.locator("#stationSug")).toBeHidden();
+  await page.fill("#formSess [name=kwh]", "10");
+  await expect(page.locator("#formSess [name=byn]")).toHaveValue("5,40");
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];

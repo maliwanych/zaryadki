@@ -102,6 +102,12 @@ section{margin-top:28px}
 .chart-labels span{flex:1 1 0;min-width:0;text-align:center;font-size:12px;color:var(--muted)}
 .chart-sel{background:var(--plate);border-radius:10px;padding:10px 12px;font-size:13px}
 .chart-sel span{color:var(--muted)}
+/* Station suggestions: our own list (the browser's datalist doesn't open in Edge on Android) */
+.sug{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:-6px;background:var(--field)}
+.sug button{display:flex;justify-content:space-between;align-items:baseline;gap:10px;background:none;border:0;border-top:1px solid var(--line);padding:11px 12px;text-align:left;font-size:16px;min-height:44px;color:var(--ink)}
+.sug button:first-child{border-top:0}
+.sug span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sug small{color:var(--muted);font-size:13px;white-space:nowrap}
 .f2f-big{font-size:30px;font-weight:700;line-height:1.2}
 .f2f-cons{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:14px}
 
@@ -320,7 +326,8 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <h2 id="sessTitle">Новая зарядка</h2>
   <div class="fgrid">
     <label class="full">Дата и время<input type="datetime-local" name="ts" required></label>
-    <label class="full">Станция<input name="station" list="stations" placeholder="Название или адрес станции" autocomplete="off"></label>
+    <label class="full">Станция<input name="station" placeholder="Название или адрес станции" autocomplete="off" aria-autocomplete="list" aria-controls="stationSug"></label>
+    <div class="full sug" id="stationSug" role="listbox" aria-label="Ваши станции" hidden></div>
     <p class="hint full" id="priceHint" hidden></p>
     <label>Заряжено, кВт·ч<input name="kwh" inputmode="decimal" required placeholder="0,00"></label>
     <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required placeholder="0,00"></label>
@@ -452,7 +459,6 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <option value="Страховка"></option><option value="Шины"></option><option value="ТО"></option>
   <option value="Мойка"></option><option value="Шиномонтаж"></option><option value="Парковка"></option>
 </datalist>
-<datalist id="stations"></datalist>
 
 <script>
 (function(){
@@ -481,7 +487,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.8";
+const APP_VERSION = "1.0.9";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -723,8 +729,6 @@ function render(){
 
   renderList(st.ss);
 
-  const dl=$("stations"); dl.innerHTML="";
-  [...new Set(S.sessions.map(s=>s.station).filter(Boolean))].sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o);});
 }
 
 
@@ -1165,7 +1169,28 @@ function autoSum(){
   const p=stationPrice(f.station.value.trim()), k=num(f.kwh.value);
   if(p!=null&&k!==null&&k>0) f.byn.value=fmt(k*p);
 }
-$("formSess").station.addEventListener("input",()=>{ applyPriceHint(); autoSum(); });
+// stations used before, the most recent first, filtered by what is typed
+function showStationSug(){
+  const f=$("formSess"), box=$("stationSug"), q=f.station.value.trim().toLowerCase();
+  const last={};
+  S.sessions.forEach(s=>{ if(s.station && !glitch(s) && (!last[s.station] || s.ts>last[s.station])) last[s.station]=s.ts; });
+  const names=Object.keys(last).sort((a,b)=>last[a]<last[b]?1:-1)
+    .filter(n=>!q || (n.toLowerCase().includes(q) && n.toLowerCase()!==q)).slice(0,6);
+  box.innerHTML="";
+  names.forEach(n=>{
+    const p=stationPrice(n), b=document.createElement("button");
+    b.type="button"; b.setAttribute("role","option");
+    b.innerHTML=`<span></span><small>${p===0?"бесплатно":`${fmt(p)} ${cur()}/кВт·ч`}</small>`;
+    b.querySelector("span").textContent=n;
+    b.addEventListener("pointerdown",e=>e.preventDefault());   // keep the focus in the field while tapping
+    b.addEventListener("click",()=>{ f.station.value=n; box.hidden=true; applyPriceHint(); autoSum(); f.kwh.focus(); });
+    box.appendChild(b);
+  });
+  box.hidden=!names.length;
+}
+$("formSess").station.addEventListener("focus",showStationSug);
+$("formSess").station.addEventListener("blur",()=>{ $("stationSug").hidden=true; });
+$("formSess").station.addEventListener("input",()=>{ applyPriceHint(); autoSum(); showStationSug(); });
 $("formSess").station.addEventListener("change",()=>{ applyPriceHint(); autoSum(); });
 $("formSess").kwh.addEventListener("input",autoSum);
 $("formSess").byn.addEventListener("input",()=>{ bynTouched=true; });
