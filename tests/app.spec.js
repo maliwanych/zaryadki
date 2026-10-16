@@ -380,13 +380,15 @@ test("настройка «Начало учёта»: км и цена счит�
   await expect(page.locator("#perNote")).toContainText("в начале учёта");
 });
 
-test("месяц: доля дешёвых — по настоящей цене, без «Ночью»", async ({ page }) => {
+test("месяц: без «доли дешёвых» и «Ночью», полоска типов зарядок на месте", async ({ page }) => {
+  // что дёшево — каждый решает сам; типы зарядок — факты
   await page.goto("./");
   await importBackup(page);
   await page.click("#btnAllMonths");
   const aug = page.locator(".month", { hasText: "Август 2026" });
-  // платные: 76,65 BYN за 125 кВт·ч = 0,61 в среднем; дешевле — 35 и 20 кВт·ч, плюс 90 бесплатных: 145 из 215 = 67%
-  await expect(aug).toContainText("Дешевле вашей средней цены 0,61 BYN/кВт·ч: 67%");
+  await expect(aug.locator(".mixbar")).toBeVisible();
+  await expect(aug).toContainText("Бесплатно");
+  await expect(aug).not.toContainText("Дешевле");
   await expect(aug).not.toContainText("Ночью");
 });
 
@@ -559,12 +561,13 @@ test("зарядки раньше начала учёта не входят в �
   expect(num(await page.locator("#regByn").getAttribute("aria-label"))).toBeCloseTo(45, 2); // а в «Потрачено» — обе
 });
 
-test("доля дешёвых в прошлом месяце не меняется от новых зарядок", async ({ page }) => {
+test("прошлый месяц не меняется от новых зарядок (экономия — по цене на конец месяца)", async ({ page }) => {
   await page.goto("./");
   await importBackup(page);
   await page.click("#btnAllMonths");
   const aug = page.locator(".month", { hasText: "Август 2026" });
-  await expect(aug).toContainText("Дешевле вашей средней цены 0,61 BYN/кВт·ч: 67%");
+  // 90 кВт·ч бесплатно × 0,61 (средняя цена платных на конец августа) ≈ 55
+  await expect(aug).toContainText("≈55 BYN");
   const savedBefore = await aug.innerText();
   await page.click("#btnAdd"); // дорогая зарядка сейчас поднимает среднюю цену
   await page.fill("#formSess [name=station]", "Дорогая");
@@ -744,6 +747,55 @@ test("открытое окно блокирует страницу за ним:
   await page.click("#dlgSess [data-close]");
   await page.mouse.wheel(0, 800);                     // окно закрыто — страница снова прокручивается
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+});
+
+// Минимальное чтение .xlsx в тестах: приложение пишет архив без сжатия, файлы идут подряд
+function readStoredZip(buf) {
+  const zlib = require("zlib");
+  const files = {};
+  let p = 0;
+  while (buf.readUInt32LE(p) === 0x04034b50) {
+    const method = buf.readUInt16LE(p + 8), crc = buf.readUInt32LE(p + 14), size = buf.readUInt32LE(p + 18);
+    const nameLen = buf.readUInt16LE(p + 26), extraLen = buf.readUInt16LE(p + 28);
+    const name = buf.slice(p + 30, p + 30 + nameLen).toString("utf8");
+    const data = buf.slice(p + 30 + nameLen + extraLen, p + 30 + nameLen + extraLen + size);
+    expect(method, name).toBe(0);
+    if (zlib.crc32) expect(zlib.crc32(data) >>> 0, `CRC ${name}`).toBe(crc);
+    files[name] = data.toString("utf8");
+    p += 30 + nameLen + extraLen + size;
+  }
+  expect(buf.readUInt32LE(buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])))).toBe(0x06054b50);
+  return files;
+}
+
+test("выгрузка в Excel: настоящий .xlsx, листы, числа — числами", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page);
+  await expect(page.locator("#btnXlsx")).toHaveText("Выгрузить в Excel");
+  await expect(page.locator("#btnCsv")).toHaveCount(0);
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#btnXlsx")]);
+  expect(download.suggestedFilename()).toMatch(/^zaryadki-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  const files = readStoredZip(fs.readFileSync(await download.path()));
+  for (const name of ["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/styles.xml", "xl/worksheets/sheet1.xml"])
+    expect(Object.keys(files)).toContain(name);
+  // каждый XML разбирается без ошибок
+  const broken = await page.evaluate(xmls => xmls.filter(x => new DOMParser().parseFromString(x, "application/xml").querySelector("parsererror")).length, Object.values(files));
+  expect(broken).toBe(0);
+  const sheets = [...files["xl/workbook.xml"].matchAll(/<sheet name="([^"]+)"/g)].map(m => m[1]);
+  expect(sheets).toEqual(["Зарядки", "Расходы", "Пробег"]);
+  const charges = files["xl/worksheets/sheet1.xml"];
+  expect((charges.match(/<row /g) || []).length).toBe(backup.sessions.length + 1);   // заголовок + зарядки
+  expect(charges).toContain("Дата и время");
+  expect(charges).toContain("Станция А");
+  // первая зарядка: 3 августа 2026 18:40 → дата Excel 46237,78; 30 кВт·ч и 19,5 BYN — числами, а не текстом
+  const row2 = charges.match(/<row r="2">(.*?)<\/row>/)[1];
+  expect(row2).toMatch(/<c r="A2" s="2"><v>46237\.77777/);
+  expect(row2).toContain('<c r="D2"><v>30</v></c>');
+  expect(row2).toContain('<c r="E2"><v>19.5</v></c>');
+  const costs = files["xl/worksheets/sheet2.xml"];
+  expect((costs.match(/<row /g) || []).length).toBe(backup.costs.length + 1);
+  const odo = files["xl/worksheets/sheet3.xml"];
+  expect((odo.match(/<row /g) || []).length).toBe(backup.odo.length + 1);
 });
 
 test("версия совпадает в index.html, sw.js и package.json", () => {
