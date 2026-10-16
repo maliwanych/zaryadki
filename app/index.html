@@ -18,19 +18,19 @@
 :root{
   --plate:#E4E8EC; --panel:#F4F6F8; --ink:#18202B; --muted:#5B6673; --line:#CBD2D9;
   --drum:#161A20; --drum-ink:#F2F4F6; --red:#C21F2B; --ac:#3F6FA8; --dc:#18202B; --hwy:#C21F2B;
-  --field:#FFFFFF;
+  --field:#FFFFFF; --fuel:#D9822B; --fuel-btn:#B5651D;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --plate:#12161B; --panel:#1B2027; --ink:#E7EBEF; --muted:#8D98A5; --line:#2C343E;
     --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
-    --field:#232932;
+    --field:#232932; --fuel:#E8A04F; --fuel-btn:#B5651D;
   }
 }
 :root[data-theme="dark"]{
   --plate:#12161B; --panel:#1B2027; --ink:#E7EBEF; --muted:#8D98A5; --line:#2C343E;
   --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
-  --field:#232932;
+  --field:#232932; --fuel:#E8A04F; --fuel-btn:#B5651D;
 }
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -113,6 +113,26 @@ section{margin-top:28px}
 .xi-prev div{display:flex;justify-content:space-between;gap:10px;background:var(--plate);border-radius:8px;padding:8px 10px}
 .xi-prev span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 .xi-prev b{white-space:nowrap;font-weight:600}
+/* Plug-in hybrid: fuel is orange everywhere */
+.t-fuel{background:var(--fuel)}
+.seg.two{grid-template-columns:repeat(2,1fr)}
+.fab{gap:10px}
+.fab button{flex:1 1 0}
+.fab #btnAddFuel{background:var(--fuel-btn);color:#fff}
+label.check{flex-direction:row;align-items:center;gap:12px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--ink);font-size:16px}
+label.check input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--fuel)}
+label.check span{display:flex;flex-direction:column}
+label.check small{font-size:12px;color:var(--muted)}
+.esplit{margin-top:14px}
+.esplit .mixbar{height:8px}
+.esplit-leg{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-top:6px}
+.chart-bars.fuelc i{background:var(--fuel)}
+.chart-bars.fuelc .sel i{background:var(--ink)}
+.chart-bars .stk{display:flex;flex-direction:column;width:100%;max-width:40px;border-radius:6px 6px 0 0;overflow:hidden}
+.chart-bars .stk i{max-width:none;border-radius:0}
+.chart-bars .stk i.fuel{background:var(--fuel)}
+.chart-bars .sel .stk{outline:2px solid var(--ink);outline-offset:2px}
+.chart-bars .sel .stk i:not(.fuel){background:var(--ac)}
 .f2f-big{font-size:30px;font-weight:700;line-height:1.2}
 .f2f-cons{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:14px}
 
@@ -238,8 +258,9 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </nav>
 
   <div class="tabbed" data-tab="overview"><div class="register-wrap">
-    <div class="reg-label">Потрачено на зарядки</div>
+    <div class="reg-label" id="regLabel">Потрачено на зарядки</div>
     <div class="reg-row"><div class="register" id="regByn"></div><div class="reg-unit cur">BYN</div></div>
+    <div class="esplit" id="eSplit" hidden><div class="mixbar"><i class="t-ac" id="eSplitBarE"></i><i class="t-fuel" id="eSplitBarF"></i></div><div class="esplit-leg"><span id="eSplitE"></span><span id="eSplitF"></span></div></div>
     <div class="regsub">
       <div><small id="monthLbl">В этом месяце</small><b id="monthByn">—</b><span id="monthSub"></span></div>
       <div><small>С прочими расходами</small><b id="ownByn">—</b><span>без разовых вложений</span></div>
@@ -285,6 +306,11 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <button class="more" id="btnAllMonths" hidden></button>
   </section>
 
+  <section id="azsSec" data-tab="sessions" data-empty="1" hidden>
+    <h2>АЗС</h2>
+    <div class="card" id="azsStats"></div>
+  </section>
+
   <section id="typesSec" data-tab="sessions">
     <h2>Цена кВт·ч по типу зарядки</h2>
     <div class="card types" id="types"></div>
@@ -313,7 +339,8 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </section>
 
   <section data-tab="sessions">
-    <h2>Все зарядки</h2>
+    <h2 id="listTitle">Все зарядки</h2>
+    <div class="pills" id="listPills" role="group" aria-label="Что показывать" hidden style="margin-bottom:10px"></div>
     <div id="list"><p class="muted">Загружаю данные…</p></div>
   </section>
 
@@ -328,7 +355,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <input type="file" id="fileImport" accept="application/json,.json,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv,text/csv,text/plain" hidden>
 </main>
 
-<div class="fab"><button id="btnAdd" disabled>Добавить зарядку</button></div>
+<div class="fab"><button id="btnAdd" disabled>Добавить зарядку</button><button id="btnAddFuel" hidden>+ Заправка</button></div>
 <div class="toast" id="toast"></div>
 
 <dialog id="dlgSess"><form class="sheet" id="formSess" method="dialog">
@@ -359,12 +386,34 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
 </form></dialog>
 
+<dialog id="dlgFuel"><form class="sheet" id="formFuel" method="dialog">
+  <h2 id="fuelTitle">Новая заправка</h2>
+  <div class="fgrid">
+    <label class="full">Дата и время<input type="datetime-local" name="ts" required></label>
+    <div class="full stwrap">
+      <label>АЗС<input name="station" placeholder="Название или адрес АЗС" autocomplete="off" aria-autocomplete="list" aria-controls="fuelSug"></label>
+      <div class="sug" id="fuelSug" role="listbox" aria-label="Ваши АЗС" hidden></div>
+    </div>
+    <p class="hint full" id="fuelHint" hidden></p>
+    <label>Литры<input name="liters" inputmode="decimal" required placeholder="0,00"></label>
+    <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required placeholder="0,00"></label>
+    <label class="full">Пробег по одометру, км<input name="odo" inputmode="numeric" placeholder="Посмотрите на панели"></label>
+    <label class="full check"><input type="checkbox" name="full"><span><b>Полный бак</b><small>заправились до автоматического отключения пистолета</small></span></label>
+    <p class="hint full">С «полным баком» и пробегом цена на 100 км считается точно — от полного бака до полного.</p>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" class="btn danger" id="btnFuelDel" hidden>Удалить</button>
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary" id="btnSaveFuel">Сохранить</button>
+  </div>
+</form></dialog>
+
 <dialog id="dlgOdo"><form class="sheet" id="formOdo" method="dialog">
   <h2>Пробег сейчас</h2>
   <div class="fgrid">
     <label>Одометр, км<input name="odo" inputmode="numeric" required></label>
-    <label>Запас хода, км<input name="range" inputmode="numeric" placeholder="С панели"></label>
-    <p class="hint full">Запас хода нужен, чтобы учесть энергию, которая уже оплачена, но ещё лежит в батарее. Обновляйте в последний день месяца — тогда месячный расход будет точным.</p>
+    <label id="odoRangeL">Запас хода, км<input name="range" inputmode="numeric" placeholder="С панели"></label>
+    <p class="hint full" id="odoHint">Запас хода нужен, чтобы учесть энергию, которая уже оплачена, но ещё лежит в батарее. Обновляйте в последний день месяца — тогда месячный расход будет точным.</p>
   </div>
   <div class="sheet-actions">
     <button type="button" class="btn" data-close>Отмена</button>
@@ -375,16 +424,20 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <dialog id="dlgSet"><form class="sheet" id="formSet" method="dialog">
   <h2>Настройки</h2>
   <div class="fgrid">
+    <div class="full"><label style="margin-bottom:4px">Тип машины</label>
+      <div class="seg two" id="ptSeg"><button type="button" data-p="ev">Электромобиль</button><button type="button" data-p="phev">Гибрид с розеткой</button></div>
+    </div>
     <label class="full">Машина<input name="carName" placeholder="Например, Geely EX5" autocomplete="off"></label>
     <label>Начало учёта<input type="date" name="purchaseDate" required></label>
     <label>Пробег в начале учёта, км<input name="startOdo" inputmode="numeric" required></label>
-    <label>Запас хода в начале учёта, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
+    <label class="ev-only">Запас хода в начале учёта, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
     <label>Валюта<select name="currency"><option value="BYN">BYN</option><option value="RUB">₽ (RUB)</option></select></label>
     <p class="hint full">Смена валюты меняет только подпись — суммы не пересчитываются.</p>
-    <label class="full">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
-    <label class="full">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
-    <p class="hint full">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
-    <p class="hint full">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
+    <label class="full ev-only">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
+    <label class="full ev-only">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
+    <p class="hint full phev-only" hidden>Начало учёта — день, с которого вы записываете все зарядки и заправки. Для гибрида запас хода и ёмкость не нужны: считаем только по тому, что вы зарядили и заправили и сколько заплатили.</p>
+    <p class="hint full ev-only">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
+    <p class="hint full ev-only">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
   </div>
   <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
   <button type="button" class="btn wipe-link" id="btnWipe" hidden>Удалить все данные</button>
@@ -505,7 +558,7 @@ function localDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padSt
 // same day n months later; 31 Jan + 1 month = end of February, not 3 March
 function addMonths(d,n){ const x=new Date(d.getFullYear(), d.getMonth()+n, 1); x.setDate(Math.min(d.getDate(), new Date(x.getFullYear(), x.getMonth()+1, 0).getDate())); return x; }
 const TYPES = {ac:{name:"AC, медленная",cls:"t-ac",var:"--ac"}, dc:{name:"DC в городе",cls:"t-dc",var:"--dc"}, hwy:{name:"DC на трассе",cls:"t-hwy",var:"--hwy"}};
-const S = {sessions:[], settings:{purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], loaded:{s:false,set:false,cur:false}};
+const S = {sessions:[], settings:{purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], fuel:[], loaded:{s:false,set:false,cur:false}};
 let lastTotal = 0, db = null, downloads = null, editingId = null, editingRef = null, editingCost = null, editingRem = null, bynTouched = false, curType = "dc", firstPaint = true;
 
 const $ = id => document.getElementById(id);
@@ -517,6 +570,7 @@ const nowLocal = () => { const d=new Date(); return `${localDate(d)}T${pad(d.get
 const cssv = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const curCode = c => Object.prototype.hasOwnProperty.call(CURRENCIES,c) ? c : "BYN";
 const cur = () => CURRENCIES[curCode(S.settings.currency)];
+const HYB = () => S.settings.powertrain==="phev";   // plug-in hybrid (EM-i, EM-R): charges and fill-ups, no car readings
 const glitch = s => (s.kwh||0) < 1;
 const isFree = s => !glitch(s) && (s.byn||0)===0;
 const plural = (n,a,b,c) => { const m10=n%10, m100=n%100; return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20))?b:c; };
@@ -525,7 +579,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.14";
+const APP_VERSION = "1.0.15";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -658,9 +712,47 @@ function computeStats(){
   return {ss,totByn,totKwh,rKwh,rByn,paidAvg,freeKwh,saved,odoNow,km,Rr,base,pending,early,pKwh,pByn,kmR,paidMax,paidMin,paid,byType,free,f:{kwh:fKwh,byn:fByn,km:fKm,n:fN,rng}};
 }
 
+/* ---------- plug-in hybrid: only what was charged and filled up and paid; the car's own readings are not used ---------- */
+function hybridStats(st){
+  const start=S.settings.purchaseDate, counted=x=>String(x.ts).slice(0,10)>=start, sum=(a,k)=>a.reduce((t,x)=>t+(x[k]||0),0);
+  const ch=S.sessions.filter(counted), fu=S.fuel.filter(counted).sort((a,b)=>a.ts<b.ts?-1:1);
+  const elec=sum(ch,"byn"), fuel=sum(fu,"byn");
+  // from one full tank to the last one: all fuel and charges in between, over the km in between
+  const anchors=fu.filter(f=>f.full&&f.odo!=null);
+  let win=null;
+  if(anchors.length>=2){ const A=anchors[0], B=anchors[anchors.length-1], km=B.odo-A.odo;
+    if(km>0){ const inW=x=>x.ts>A.ts&&x.ts<=B.ts, fw=fu.filter(inW), cw=ch.filter(inW);
+      win={km, n:anchors.length-1, byn:sum(fw,"byn")+sum(cw,"byn"), liters:sum(fw,"liters"), kwh:sum(cw,"kwh")}; } }
+  const base=win||(st.km>0?{km:st.km, byn:elec+fuel, liters:sum(fu,"liters"), kwh:sum(ch,"kwh")}:null);
+  return {elecAll:sum(S.sessions,"byn"), fuelAll:sum(S.fuel,"byn"), win, approx:!win, share:elec+fuel>0?elec/(elec+fuel):null,
+    per100:base?base.byn/base.km*100:null, l100:base?base.liters/base.km*100:null, kwh100:base?base.kwh/base.km*100:null};
+}
+const FIG_LABELS={
+  ev:[()=>`${cur()} на 100 км`,()=>"кВт·ч на 100 км",()=>`${cur()} за кВт·ч в среднем`,()=>"км проехано",()=>"кВт·ч залито"],
+  phev:[()=>`${cur()} на 100 км`,()=>"денег — на электричество",()=>"бензина на 100 км пути",()=>"из сети на 100 км пути",()=>"км проехано"],
+};
+function setFigLabels(hyb){ const sm=document.querySelectorAll(".figs .fig small"); FIG_LABELS[hyb?"phev":"ev"].forEach((f,i)=>{ sm[i].textContent=f(); }); }
+function hybridFigs(st,h,notes,how){
+  const ap=h.approx?"≈":"";
+  $("fPer100").textContent=h.per100!=null?ap+fmt(h.per100,1):"—";
+  $("fCons").textContent=h.share!=null?`${fmt(h.share*100,0)}%`:"—";
+  $("fPrice").textContent=h.l100!=null?`${ap}${fmt(h.l100,1)} л`:"—";
+  $("fKm").textContent=h.kwh100!=null?`${ap}${fmt(h.kwh100,1)} кВт·ч`:"—";
+  $("fKwh").textContent=st.km>0?fmtInt(st.km):"—";
+  $("fSaved").textContent=st.freeKwh>0?`≈${fmt(st.saved,0)} ${cur()}`:"—";
+  $("fSavedL").textContent="сэкономлено на бесплатных зарядках";
+  if(h.win) notes.push(`Цена — от полного бака до полного: ${h.win.n} ${plural(h.win.n,"отрезок","отрезка","отрезков")}, ${fmtInt(h.win.km)} км.`);
+  else if(st.km>0) notes.push("≈ по всем записям с начала учёта. Для точной цены нужны две заправки «полный бак» с пробегом.");
+  else notes.push("Укажите пробег — в заправке или кнопкой «Обновить», — чтобы посчитать стоимость километра.");
+  how.push("Берём все зарядки и заправки между двумя заправками «полный бак» с пробегом и делим на километры между ними — так кусками купленный бензин не искажает цену.");
+  how.push("«На 100 км пути» — сколько в среднем залито на 100 км, включая километры, проеханные на другом источнике. Это не расход машины.");
+  how.push("Данные машины (запас хода, расход с панели) не используются.");
+}
+
 /* ---------- render ---------- */
 function render(){
-  const st = computeStats();
+  const st = computeStats(), hyb=HYB(), h=hyb?hybridStats(st):null;
+  st.h=h;
   const pd = new Date(S.settings.purchaseDate+"T00:00");
   $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}).replace(/\s(г\.)$/,"\u00a0$1");   // «г.» never on a line of its own
   $("carName").textContent = S.settings.carName || "Мой электромобиль";
@@ -670,20 +762,29 @@ function render(){
   iosHint();
 
   document.querySelectorAll(".cur").forEach(e=>{ e.textContent=cur(); });
+  $("regLabel").textContent = hyb ? "Потрачено на энергию" : "Потрачено на зарядки";
+  $("eSplit").hidden = !hyb;
+  if(hyb){ const t=h.elecAll+h.fuelAll, pe=t?h.elecAll/t*100:0;
+    $("eSplitBarE").style.width=pe.toFixed(1)+"%"; $("eSplitBarF").style.width=(100-pe).toFixed(1)+"%";
+    $("eSplitE").textContent=`зарядки ${fmt(h.elecAll)} ${cur()}`; $("eSplitF").textContent=`бензин ${fmt(h.fuelAll)} ${cur()}`; }
+  updateFab();
   // roubles add up fast: one more drum once the total passes 99 999,99
-  const digits=Math.max(5,String(Math.floor(st.totByn)).length);
+  const total=st.totByn+(h?h.fuelAll:0);   // a hybrid spends on fuel too
+  const digits=Math.max(5,String(Math.floor(total)).length);
   if($("regByn")._digits!==digits) buildRegister($("regByn"),digits);
   // the first frame animates from zero; later renders may land before it, so it reads the latest total
-  lastTotal = st.totByn;
+  lastTotal = total;
   if(firstPaint){ firstPaint=false; requestAnimationFrame(()=>requestAnimationFrame(()=>setRegister($("regByn"),lastTotal))); }
-  else setRegister($("regByn"),st.totByn);
+  else setRegister($("regByn"),total);
 
+  const notes = [], how = [];   // notes: in sight (actions, warnings); how: under «Как это считается»
+  setFigLabels(hyb);
+  if(hyb) hybridFigs(st,h,notes,how); else {
   $("fPrice").textContent = st.rKwh>0 ? fmt(st.rByn/st.rKwh) : "—";
   $("fKm").textContent = st.km>0 ? fmtInt(st.km) : "—";
   $("fKwh").textContent = fmt(st.totKwh,1);
   $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} ${cur()}` : "—";
   $("fSavedL").textContent = st.freeKwh>0 ? `сэкономлено на бесплатных ${fmt(st.freeKwh,0)} кВт·ч` : "сэкономлено на бесплатных зарядках";
-  const notes = [], how = [];   // notes: in sight (actions, warnings); how: under «Как это считается»
   if(st.kmR>0 && st.paid<=0){
     // came with more range than is paid for so far (e.g. 10 km after purchase): the figures would be negative
     $("fPer100").textContent="—"; $("fCons").textContent="—";
@@ -702,19 +803,21 @@ function render(){
     if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
   } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
   if(st.paidAvg!=null && st.freeKwh>0) how.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} ${cur()}/кВт·ч — по этой цене считается экономия.`);
+  }
   // under the meter: this month's charging and the running cost of the car
   const now=new Date(), mKey=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
   const mS=S.sessions.filter(x=>x.ts.slice(0,7)===mKey && !glitch(x));
+  const mF=hyb?S.fuel.filter(x=>String(x.ts).slice(0,7)===mKey):[];
   $("monthLbl").textContent = "В " + now.toLocaleDateString("ru-RU",{month:"long"}).replace(/ь$/,"е").replace(/й$/,"е").replace(/т$/,"те");
-  $("monthByn").textContent = `${fmt(mS.reduce((a,x)=>a+(x.byn||0),0))} ${cur()}`;
-  $("monthSub").textContent = `${mS.length} ${plural(mS.length,"зарядка","зарядки","зарядок")}, ${fmt(mS.reduce((a,x)=>a+x.kwh,0),0)} кВт·ч`;
-  $("ownByn").textContent = `${fmt(st.totByn + S.costs.reduce((a,c)=>a+accrued(c,now),0))} ${cur()}`;
-  const withBat=S.sessions.filter(x=>x.kwhBat&&x.kwh);
+  $("monthByn").textContent = `${fmt(mS.reduce((a,x)=>a+(x.byn||0),0)+mF.reduce((a,x)=>a+(x.byn||0),0))} ${cur()}`;
+  $("monthSub").textContent = hyb ? `${mS.length} ${plural(mS.length,"зарядка","зарядки","зарядок")}, ${mF.length} ${plural(mF.length,"заправка","заправки","заправок")}` : `${mS.length} ${plural(mS.length,"зарядка","зарядки","зарядок")}, ${fmt(mS.reduce((a,x)=>a+x.kwh,0),0)} кВт·ч`;
+  $("ownByn").textContent = `${fmt(total + S.costs.reduce((a,c)=>a+accrued(c,now),0))} ${cur()}`;
+  const withBat=hyb?[]:S.sessions.filter(x=>x.kwhBat&&x.kwh);
   if(withBat.length){
     const w=withBat.reduce((a,x)=>a+x.kwh,0), b=withBat.reduce((a,x)=>a+x.kwhBat,0);
     how.push(`Потери при зарядке по замерам (${withBat.length} ${plural(withBat.length,"зарядка","зарядки","зарядок")}) — ${fmt((w/b-1)*100,1)}%.`);
   }
-  if(S.settings.carCons && st.paid>0) how.push(`Бортовой компьютер показывал ${fmt(S.settings.carCons,1)} кВт·ч/100 км — это расход без потерь на зарядку.`);
+  if(!hyb && S.settings.carCons && st.paid>0) how.push(`Бортовой компьютер показывал ${fmt(S.settings.carCons,1)} кВт·ч/100 км — это расход без потерь на зарядку.`);
   const pn=$("perNote"); pn.innerHTML="";
   const para=(box,t)=>{ const e=document.createElement("p"); e.textContent=t; box.appendChild(e); };
   notes.forEach(t=>para(pn,t));
@@ -726,7 +829,7 @@ function render(){
   }
 
   const Rr=st.Rr;
-  $("odoNow").textContent = st.odoNow>0 ? `${fmtInt(st.odoNow)} км${Rr?`, запас ${fmtInt(Rr.range)} км${Rr.odo<st.odoNow?` (на ${fmtInt(Rr.odo)} км)`:""}`:""}` : "не указан";
+  $("odoNow").textContent = st.odoNow>0 ? `${fmtInt(st.odoNow)} км${!hyb&&Rr?`, запас ${fmtInt(Rr.range)} км${Rr.odo<st.odoNow?` (на ${fmtInt(Rr.odo)} км)`:""}`:""}` : "не указан";
   const stale=$("odoStale");
   const lastT = RD.length>1 ? RD[RD.length-1].t : null;
   const days = lastT ? Math.floor((Date.now()-lastT)/864e5) : null;
@@ -746,12 +849,13 @@ function render(){
 
   renderMonths(st);
   renderStations();
+  renderAzs();
   renderCosts(st);
   renderReminders(st);
 
   // full-to-full
-  showIf($("f2fSec"), st.f.n>0);
-  if(st.f.n>0){
+  showIf($("f2fSec"), st.f.n>0 && !hyb);
+  if(st.f.n>0 && !hyb){
     const cap = S.settings.capKwh, R=st.f.rng;
     const consHtml = `<b>${fmt(st.f.kwh/st.f.km*100,1)} кВт·ч</b> и <b>${fmt(st.f.byn/st.f.km*100,1)} ${cur()}</b> на 100 км <span class="muted">— точный расход от полного до полного, ${st.f.n} ${plural(st.f.n,"интервал","интервала","интервалов")}, ${fmtInt(st.f.km)} км</span>`;
     let html = `<div>${consHtml}</div><p class="mnote">Реальный запас на полном заряде появится, когда в полных зарядках будет заполнено «Приняла машина, кВт·ч».</p>`;
@@ -772,40 +876,66 @@ function render(){
 }
 
 
-let listLimit=12;
+let listLimit=12, listFilter="all";
 function renderList(ss){
-  const el=$("list"); el.innerHTML="";
-  if(!ss.length){ el.innerHTML='<p class="muted">Зарядок пока нет. Нажмите «Добавить зарядку», когда будете у станции.</p>'; return; }
-  const all=ss.slice().reverse(); const shown=all.slice(0,listLimit);
-  const groups={}; shown.forEach(s=>{ const k=s.ts.slice(0,10); (groups[k]=groups[k]||[]).push(s); });
+  const hyb=HYB(), el=$("list"); el.innerHTML="";
+  $("listTitle").textContent=hyb?"Зарядки и заправки":"Все зарядки";
+  $("listPills").hidden=!hyb;
+  if(hyb) $("listPills").innerHTML=[["all","Все"],["charge","Зарядки"],["fuel","Заправки"]].map(([k,l])=>`<button type="button" data-f="${k}" aria-pressed="${k===listFilter}">${l}</button>`).join("");
+  const showS=!hyb||listFilter!=="fuel", showF=hyb&&listFilter!=="charge";
+  const items=[...(showS?ss.map(x=>({fuel:false,ts:x.ts,x})):[]), ...(showF?S.fuel.map(x=>({fuel:true,ts:x.ts,x})):[])].sort((a,b)=>a.ts<b.ts?1:-1);
+  if(!items.length){ el.innerHTML=hyb?'<p class="muted">Записей пока нет.</p>':'<p class="muted">Зарядок пока нет. Нажмите «Добавить зарядку», когда будете у станции.</p>'; return; }
+  const shown=items.slice(0,listLimit);
+  const groups={}; shown.forEach(it=>{ const k=it.ts.slice(0,10); (groups[k]=groups[k]||[]).push(it); });
   Object.keys(groups).forEach(k=>{
     const g=document.createElement("div"); g.className="day";
     const d=new Date(k+"T00:00");
-    const sum=groups[k].reduce((a,s)=>a+(s.byn||0),0);
+    const sum=groups[k].reduce((a,it)=>a+(it.x.byn||0),0);
     g.innerHTML=`<h3>${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",weekday:"short"})} · ${fmt(sum)} ${cur()}</h3>`;
-    groups[k].forEach(s=>{
-      const b=document.createElement("button"); b.type="button"; b.className="sess"+(glitch(s)?" glitch":"");
-      const t=TYPES[s.type]||TYPES.dc; const p = s.kwh? s.byn/s.kwh : 0;
-      const bits=[s.ts.slice(11,16), glitch(s)?"сбой старта":isFree(s)?"бесплатно, "+t.name.split(",")[0]:t.name];
-      if(s.socFrom!=null&&s.socTo!=null) bits.push(`${s.socFrom}→${s.socTo}%`); else if(s.socTo!=null) bits.push(`до ${s.socTo}%`);
-      if(s.odo!=null) bits.push(`${fmtInt(s.odo)} км`);
-      if(s.kwhBat&&s.kwh) bits.push(`потери ${fmt((s.kwh/s.kwhBat-1)*100,0)}%`);
-      b.innerHTML=`<span class="stripe ${t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} ${cur()}</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
-      b.querySelector(".st").textContent = s.station || "Без названия";
-      b.querySelectorAll(".meta")[0].textContent = bits.join(" · ");
-      b.addEventListener("click",()=>openSess(s));
+    groups[k].forEach(it=>{
+      const s=it.x, b=document.createElement("button"); b.type="button";
+      if(it.fuel){
+        b.className="sess";
+        const bits=[s.ts.slice(11,16),"бензин"]; if(s.full) bits.push("полный бак"); if(s.odo!=null) bits.push(`${fmtInt(s.odo)} км`);
+        b.innerHTML=`<span class="stripe t-fuel"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} ${cur()}</span><span class="meta"></span><span class="meta r">${fmt(s.liters||0,1)} л · ${s.liters?fmt(s.byn/s.liters):"—"}</span>`;
+        b.querySelector(".st").textContent = s.station || "АЗС";
+        b.querySelectorAll(".meta")[0].textContent = bits.join(" · ");
+        b.addEventListener("click",()=>openFuel(s));
+      } else {
+        b.className="sess"+(glitch(s)?" glitch":"");
+        const t=TYPES[s.type]||TYPES.dc; const p = s.kwh? s.byn/s.kwh : 0;
+        const bits=[s.ts.slice(11,16), glitch(s)?"сбой старта":isFree(s)?"бесплатно, "+t.name.split(",")[0]:t.name];
+        if(s.socFrom!=null&&s.socTo!=null) bits.push(`${s.socFrom}→${s.socTo}%`); else if(s.socTo!=null) bits.push(`до ${s.socTo}%`);
+        if(s.odo!=null) bits.push(`${fmtInt(s.odo)} км`);
+        if(s.kwhBat&&s.kwh) bits.push(`потери ${fmt((s.kwh/s.kwhBat-1)*100,0)}%`);
+        b.innerHTML=`<span class="stripe ${t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} ${cur()}</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
+        b.querySelector(".st").textContent = s.station || "Без названия";
+        b.querySelectorAll(".meta")[0].textContent = bits.join(" · ");
+        b.addEventListener("click",()=>openSess(s));
+      }
       g.appendChild(b);
     });
     el.appendChild(g);
   });
-  if(all.length>shown.length){
+  if(items.length>shown.length){
     const b=document.createElement("button"); b.type="button"; b.className="more";
-    b.textContent=`Показать ещё ${all.length-shown.length}`;
+    b.textContent=`Показать ещё ${items.length-shown.length}`;
     b.addEventListener("click",()=>{ listLimit+=24; render(); }); el.appendChild(b);
   } else if(listLimit>12){
     const b=document.createElement("button"); b.type="button"; b.className="more";
     b.textContent="Свернуть список"; b.addEventListener("click",()=>{ listLimit=12; render(); }); el.appendChild(b);
   }
+}
+$("listPills").addEventListener("click",e=>{ const b=e.target.closest("button[data-f]"); if(b){ listFilter=b.dataset.f; render(); } });
+// fill-up stations: price per litre, the cheapest first
+function renderAzs(){
+  const on=HYB()&&S.fuel.length>0; showIf($("azsSec"),on); if(!on) return;
+  const map={}; S.fuel.forEach(f=>{ const k=f.station||"Без названия", m=map[k]=map[k]||{l:0,byn:0,n:0}; m.l+=f.liters||0; m.byn+=f.byn||0; m.n++; });
+  const el=$("azsStats"); el.innerHTML="";
+  Object.entries(map).map(([k,v])=>({name:k,...v,price:v.l?v.byn/v.l:0})).sort((a,b)=>a.price-b.price).forEach(r=>{
+    const d=document.createElement("div"); d.className="rowline";
+    d.innerHTML=`<span class="l"><b></b><small>${r.n} ${plural(r.n,"заправка","заправки","заправок")} · ${fmt(r.l,1)} л · ${fmt(r.byn)} ${cur()}</small></span><span class="r"><b>${fmt(r.price)}</b><small>${cur()}/л</small></span>`;
+    d.querySelector("b").textContent=r.name; el.appendChild(d); });
 }
 
 /* ---------- stations ---------- */
@@ -916,6 +1046,7 @@ function readings(){
   const r=[{t:new Date(S.settings.purchaseDate+"T00:00"), odo:S.settings.startOdo||0, range:S.settings.startRange??null}];
   S.odoLog.forEach(x=>{ if(x.odo!=null&&x.date) r.push({t:new Date(x.date),odo:x.odo,range:x.range??null}); });
   S.sessions.forEach(x=>{ if(x.odo!=null) r.push({t:new Date(x.ts),odo:x.odo,range:null}); });
+  S.fuel.forEach(x=>{ if(x.odo!=null&&x.ts) r.push({t:new Date(x.ts),odo:x.odo,range:null}); });
   if(S.current&&S.current.odo!=null&&S.current.date) r.push({t:new Date(S.current.date),odo:S.current.odo,range:S.current.range??null});
   return r.sort((a,b)=>a.t-b.t);
 }
@@ -930,11 +1061,15 @@ function monthStats(){
   while(new Date(y,m,1)<=now){
     const start=new Date(y,m,1), end=new Date(y,m+1,1), from=start<purchase?purchase:start, to=end>now?now:end;
     const ss=S.sessions.filter(s=>{const t=new Date(s.ts);return t>=start&&t<end;});
+    const fu=S.fuel.filter(x=>{const t=new Date(x.ts);return t>=start&&t<end;});
+    const fuelByn=fu.reduce((a,x)=>a+(x.byn||0),0), liters=fu.reduce((a,x)=>a+(x.liters||0),0);
     const real=ss.filter(s=>!glitch(s));
     const byn=ss.reduce((a,s)=>a+(s.byn||0),0), kwh=ss.reduce((a,s)=>a+(s.kwh||0),0);
     const rk=real.reduce((a,s)=>a+s.kwh,0), rb=real.reduce((a,s)=>a+s.byn,0);
     const ref=S.refunds.filter(x=>{ if(!x.date) return y===purchase.getFullYear()&&m===purchase.getMonth(); const t=new Date(x.date+"T12:00"); return t>=start&&t<end; }).reduce((a,x)=>a+(x.byn||0),0);
     const km=Math.max(0,odoAt(r,to)-odoAt(r,from));
+    // hybrid: the month's money and what was filled, over the month's distance
+    const hPer100=km>50?(byn+fuelByn)/km*100:null, l100=km>50?liters/km*100:null, kwh100=km>50?kwh/km*100:null;
     // consumption: between first and last readings with known range inside the month
     const wr=r.filter(x=>x.range!=null&&x.t>=from&&x.t<=to);
     let cons=null, per100=null, exact=false;
@@ -949,7 +1084,7 @@ function monthStats(){
     const saved=avg?mix.free*avg:0;
     const partial=end>now;
     const costs=S.costs.reduce((a,c)=>a+costInRange(c,start,to),0);
-    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,avg,partial,costs,saved});
+    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,avg,partial,costs,saved,fuelByn,liters,nF:fu.length,hPer100,l100,kwh100});
     m++; if(m>11){m=0;y++;}
   }
   return out;
@@ -965,30 +1100,41 @@ const CHART={
   cons:{pill:()=>"кВт·ч/100 км", unit:()=>"кВт·ч на 100 км", d:1, approx:true, get:M=>M.cons},
   spent:{pill:()=>"Потрачено", unit:()=>`${cur()} на зарядки`, d:2, approx:false, get:M=>M.byn},
 };
+const CHART_H={
+  per100:{pill:()=>`${cur()}/100 км`, unit:()=>`${cur()} на 100 км`, d:1, approx:true, get:M=>M.hPer100},
+  spent:{pill:()=>"Потрачено", unit:()=>`${cur()} на энергию`, d:2, approx:false, get:M=>M.byn+M.fuelByn, stack:true},
+  l100:{pill:()=>"л/100 км пути", unit:()=>"л бензина на 100 км пути", d:1, approx:true, get:M=>M.l100, fuel:true},
+};
 let chartMetric="per100", chartSel=null, chartLen=0, showAllMonths=false, showHow=false;
 function showIf(sec,on){ sec.dataset.empty=on?"0":"1"; sec.hidden=!on||tab!==sec.dataset.tab; }
 function renderChart(ms,st){
-  showIf($("chartSec"), ms.some(M=>M.byn>0));
+  showIf($("chartSec"), ms.some(M=>M.byn>0||M.fuelByn>0));
   if(!ms.length) return;
-  const last=ms.slice(-12), cfg=CHART[chartMetric];
+  const hyb=HYB(), SET=hyb?CHART_H:CHART;
+  if(!SET[chartMetric]) chartMetric="per100";
+  const last=ms.slice(-12), cfg=SET[chartMetric];
   if(chartSel==null||last.length!==chartLen) chartSel=last.length-1;   // new data (or a new month): back to the current month
   chartLen=last.length;
   // reference line: the whole period for per-km figures, the average full month for spending
   let ref=null, refText="";
-  if(chartMetric!=="spent" && st.kmR>0 && st.paid>0){ ref=(chartMetric==="per100"?st.pByn:st.pKwh)/st.paid*100; refText=`всего ${fmt(ref,1)}`; }
-  if(chartMetric==="spent"){ const full=last.filter(M=>!M.partial); if(full.length){ ref=full.reduce((a,M)=>a+M.byn,0)/full.length; refText=`в среднем ${fmt(ref,0)}`; } }
+  if(hyb){ const v=chartMetric==="per100"?st.h&&st.h.per100:chartMetric==="l100"?st.h&&st.h.l100:null; if(v!=null){ ref=v; refText=`всего ${fmt(v,1)}`; } }
+  else if(chartMetric!=="spent" && st.kmR>0 && st.paid>0){ ref=(chartMetric==="per100"?st.pByn:st.pKwh)/st.paid*100; refText=`всего ${fmt(ref,1)}`; }
+  if(chartMetric==="spent"){ const full=last.filter(M=>!M.partial); if(full.length){ ref=full.reduce((a,M)=>a+cfg.get(M),0)/full.length; refText=`в среднем ${fmt(ref,0)}`; } }
   const vals=last.map(cfg.get), H=150, many=last.length>6;
   const max=Math.max(ref||0, ...vals.filter(v=>v!=null), 0.01);
   const label=(v,M,d)=>v==null?"—":(cfg.approx&&!M.exact?"≈":"")+fmt(v,d);
   const name=M=>{ const n=new Date(M.y,M.m,1).toLocaleDateString("ru-RU",{month:"long",year:"numeric"}).replace(/\s*г\.$/,""); return n[0].toUpperCase()+n.slice(1); };
-  $("chartPills").innerHTML=Object.keys(CHART).map(k=>`<button type="button" data-k="${k}" aria-pressed="${k===chartMetric}">${CHART[k].pill()}</button>`).join("");
+  $("chartPills").innerHTML=Object.keys(SET).map(k=>`<button type="button" data-k="${k}" aria-pressed="${k===chartMetric}">${SET[k].pill()}</button>`).join("");
   $("chartArea").style.setProperty("--gap", many?"5px":"14px"); $("chartLabels").style.setProperty("--gap", many?"5px":"14px");
   $("chartArea").innerHTML=(ref!=null?`<div class="chart-ref" style="bottom:${Math.round(ref/max*H)}px"><span>${refText}</span></div>`:"")
-    +`<div class="chart-bars">`+last.map((M,i)=>{ const v=vals[i], sel=i===chartSel;
-      return `<button type="button" data-i="${i}" class="${sel?"sel":""} ${M.partial?"partial":""}" aria-pressed="${sel}" aria-label="${name(M)}: ${label(v,M,cfg.d)} ${cfg.unit()}">${!many||sel?`<small>${label(v,M,chartMetric==="spent"?0:cfg.d)}</small>`:""}<i style="height:${v?Math.max(2,Math.round(v/max*H)):0}px"></i></button>`; }).join("")+`</div>`;
+    +`<div class="chart-bars${cfg.fuel?" fuelc":""}">`+last.map((M,i)=>{ const v=vals[i], sel=i===chartSel, hgt=v?Math.max(2,Math.round(v/max*H)):0;
+      // spending of a hybrid: electricity below, fuel on top
+      const he=cfg.stack&&v?Math.round(M.byn/max*H):0, bar=cfg.stack?`<span class="stk"><i class="fuel" style="height:${Math.max(0,hgt-he)}px"></i><i style="height:${he}px"></i></span>`:`<i style="height:${hgt}px"></i>`;
+      return `<button type="button" data-i="${i}" class="${sel?"sel":""} ${M.partial?"partial":""}" aria-pressed="${sel}" aria-label="${name(M)}: ${label(v,M,cfg.d)} ${cfg.unit()}">${!many||sel?`<small>${label(v,M,chartMetric==="spent"?0:cfg.d)}</small>`:""}${bar}</button>`; }).join("")+`</div>`;
   $("chartLabels").innerHTML=last.map(M=>`<span>${MONTH_SHORT[M.m]}</span>`).join("");
   const M=last[chartSel], v=vals[chartSel];
-  $("chartSel").innerHTML=`<b>${name(M)}${M.partial?" · идёт":""}</b> <span>${v==null?"нет данных: мало километров за месяц":`${label(v,M,cfg.d)} ${cfg.unit()}${cfg.approx&&!M.exact?" — приблизительно: в начале или конце месяца не указан запас хода":""}`}</span>`;
+  const detail=v==null?"нет данных: мало километров за месяц":cfg.stack?`${fmt(v)} ${cur()}: электричество ${fmt(M.byn)}, бензин ${fmt(M.fuelByn)}`:`${label(v,M,cfg.d)} ${cfg.unit()}${cfg.approx&&!M.exact?(hyb?" — приблизительно: по пробегу за месяц":" — приблизительно: в начале или конце месяца не указан запас хода"):""}`;
+  $("chartSel").innerHTML=`<b>${name(M)}${M.partial?" · идёт":""}</b> <span>${detail}</span>`;
 }
 $("chartPills").addEventListener("click",e=>{ const b=e.target.closest("button[data-k]"); if(b){ chartMetric=b.dataset.k; render(); } });
 $("chartArea").addEventListener("click",e=>{ const b=e.target.closest("button[data-i]"); if(b){ chartSel=Number(b.dataset.i); render(); } });
@@ -1005,6 +1151,22 @@ function renderMonths(st){
     const P=arr[i+1]||null;
     const name=new Date(M.y,M.m,1).toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
     const d=document.createElement("div"); d.className="month";
+    if(HYB()){   // plug-in hybrid: money on energy, its split, what was filled per 100 km of the way
+      const tot=M.byn+M.fuelByn, sh=tot?M.byn/tot*100:null;
+      d.innerHTML=`<h3><span>${name[0].toUpperCase()+name.slice(1)}</span><small>${M.partial?"идёт":""}</small></h3>
+        <div class="mgrid">
+          <div><b>${fmtInt(M.km)} км</b><small>проехано</small></div>
+          <div><b>${fmt(tot)} ${cur()}</b><small>на энергию</small></div>
+          <div><b>${M.hPer100!=null?"≈"+fmt(M.hPer100,1):"—"}${delta(M.hPer100,P&&P.hPer100,true)}</b><small>${cur()} на 100 км</small></div>
+          <div><b>${sh!=null?fmt(sh,0)+"%":"—"}</b><small>денег — на электричество</small></div>
+          <div><b>${M.l100!=null?fmt(M.l100,1)+" л":"—"}</b><small>бензина на 100 км пути</small></div>
+          <div><b>${M.kwh100!=null?fmt(M.kwh100,1)+" кВт·ч":"—"}</b><small>из сети на 100 км пути</small></div>
+          <div><b>${fmt(M.liters,0)} л · ${fmt(M.kwh,0)} кВт·ч</b><small>залито</small></div>
+          <div><b>${fmt(M.costs)} ${cur()}</b><small>прочие расходы</small></div>
+        </div>
+        ${tot?`<div class="mix"><div class="mixbar"><i class="t-ac" style="width:${sh.toFixed(1)}%"></i><i class="t-fuel" style="width:${(100-sh).toFixed(1)}%"></i></div><div class="mixleg"><span><i class="dot t-ac"></i>электричество ${fmt(M.byn)} ${cur()}${M.price!=null?` · ${fmt(M.price)} за кВт·ч`:""}</span><span><i class="dot t-fuel"></i>бензин ${fmt(M.fuelByn)} ${cur()}</span></div></div>`:""}`;
+      el.appendChild(d); return;
+    }
     const mixTot=Object.values(M.mix).reduce((a,b)=>a+b,0);
     let bar="", leg="";
     for(const k of ["hwy","dc","ac","free"]){ if(!M.mix[k]) continue; const pc=M.mix[k]/mixTot*100;
@@ -1053,6 +1215,8 @@ function lastType(){ const ss=S.sessions.slice().sort((a,b)=>a.ts<b.ts?1:-1); re
 let tab="overview";
 const FAB={overview:["Добавить зарядку",()=>openSess(null)], sessions:["Добавить зарядку",()=>openSess(null)],
            costs:["Добавить расход",()=>openCost(null)], rem:["Добавить напоминание",()=>openRem(null)]};
+// a hybrid gets two buttons on «Обзор» and «Зарядки»: a charge and a fill-up
+function updateFab(){ const two=HYB()&&(tab==="overview"||tab==="sessions"); $("btnAddFuel").hidden=!two; $("btnAdd").textContent=two?"+ Зарядка":FAB[tab][0]; }
 function setTab(t){
   tab=t;
   $("tabs").querySelectorAll("button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
@@ -1061,7 +1225,7 @@ function setTab(t){
     if(el.dataset.empty!==undefined){ el.hidden = !on || el.dataset.empty==="1"; }
     else el.hidden = !on;
   });
-  $("btnAdd").textContent=FAB[t][0];
+  updateFab();
   window.scrollTo({top:0});
 }
 $("tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-tab]"); if(b) setTab(b.dataset.tab); });
@@ -1102,7 +1266,8 @@ function armConfirm(btn, action){
 function disarm(btn){ btn.dataset.armed=""; btn.textContent=btn.dataset.label||"Удалить"; clearTimeout(btn._t); }
 armConfirm($("btnDel"), async()=>{ if(!editingId||!db) return; await db.collection("sessions").doc(editingId).delete(); $("dlgSess").close(); toast("Зарядка удалена"); });
 
-$("btnOdo").addEventListener("click",()=>{ const f=$("formOdo"); f.odo.value=curOdo()||""; f.range.value=""; $("dlgOdo").showModal(); f.range.focus(); });
+const ODO_HINT_EV=$("odoHint").textContent, ODO_HINT_HYB="Пробег нужен, чтобы посчитать стоимость километра и напоминания по пробегу.";
+$("btnOdo").addEventListener("click",()=>{ const f=$("formOdo"); f.odo.value=curOdo()||""; f.range.value=""; $("odoRangeL").hidden=HYB(); $("odoHint").textContent=HYB()?ODO_HINT_HYB:ODO_HINT_EV; $("dlgOdo").showModal(); f.range.focus(); });
 $("formOdo").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target; const odo=num(f.odo.value);
   if(odo===null){ toast("Укажите пробег"); return; }
@@ -1112,7 +1277,16 @@ $("formOdo").addEventListener("submit",async e=>{
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
-function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency);
+// the type of car: a plug-in hybrid doesn't need the range and battery fields
+let curPt="ev";
+function setPt(p){
+  curPt=p;
+  $("ptSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.p===p));
+  document.querySelectorAll("#formSet .ev-only").forEach(el=>{ el.hidden=p==="phev"; });
+  document.querySelectorAll("#formSet .phev-only").forEach(el=>{ el.hidden=p!=="phev"; });
+}
+$("ptSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-p]"); if(b) setPt(b.dataset.p); });
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency); setPt(S.settings.powertrain==="phev"?"phev":"ev");
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
   if(u) b.dataset.label=`Вернуть данные, как было до ${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}, ${new Date(u.at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}`;
   disarm(b);
@@ -1122,7 +1296,7 @@ $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
 $("formSet").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target;
-  try{ await db.doc("meta/settings").set({...S.settings, carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), currency:f.currency.value, carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
+  try{ await db.doc("meta/settings").set({...S.settings, carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), currency:f.currency.value, powertrain:curPt, carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
 
@@ -1213,24 +1387,29 @@ function autoSum(){
   const p=stationPrice(f.station.value.trim()), k=num(f.kwh.value);
   if(p!=null&&k!==null&&k>0) f.byn.value=fmt(k*p);
 }
-// stations used before, the most recent first, filtered by what is typed
-function showStationSug(){
-  const f=$("formSess"), box=$("stationSug"), q=f.station.value.trim().toLowerCase();
-  const last={};
-  S.sessions.forEach(s=>{ if(s.station && !glitch(s) && (!last[s.station] || s.ts>last[s.station])) last[s.station]=s.ts; });
+// names used before, the most recent first, filtered by what is typed (stations and fill-up stations)
+function suggest(input,box,items,priceText,pick){
+  const q=input.value.trim().toLowerCase(), last={};
+  items.forEach(x=>{ if(x.name && (!last[x.name] || x.ts>last[x.name])) last[x.name]=x.ts; });
   const names=Object.keys(last).sort((a,b)=>last[a]<last[b]?1:-1)
     .filter(n=>!q || (n.toLowerCase().includes(q) && n.toLowerCase()!==q));
   box.innerHTML="";
   names.forEach(n=>{
-    const p=stationPrice(n), b=document.createElement("button");
+    const b=document.createElement("button");
     b.type="button"; b.setAttribute("role","option");
-    b.innerHTML=`<span></span><small>${p===0?"бесплатно":`${fmt(p)} ${cur()}/кВт·ч`}</small>`;
+    b.innerHTML=`<span></span><small>${priceText(n)}</small>`;
     b.querySelector("span").textContent=n;
     b.addEventListener("pointerdown",e=>e.preventDefault());   // keep the focus in the field while tapping
-    b.addEventListener("click",()=>{ f.station.value=n; box.hidden=true; applyPriceHint(); autoSum(); f.kwh.focus(); });
+    b.addEventListener("click",()=>{ input.value=n; box.hidden=true; pick(); });
     box.appendChild(b);
   });
   box.hidden=!names.length; box.scrollTop=0;
+}
+function showStationSug(){
+  const f=$("formSess");
+  suggest(f.station,$("stationSug"),S.sessions.filter(s=>!glitch(s)).map(s=>({name:s.station,ts:s.ts})),
+    n=>{ const p=stationPrice(n); return p===0?"бесплатно":p==null?"":`${fmt(p)} ${cur()}/кВт·ч`; },
+    ()=>{ applyPriceHint(); autoSum(); f.kwh.focus(); });
 }
 $("formSess").station.addEventListener("focus",showStationSug);
 $("formSess").station.addEventListener("blur",()=>{ $("stationSug").hidden=true; });
@@ -1238,6 +1417,43 @@ $("formSess").station.addEventListener("input",()=>{ applyPriceHint(); autoSum()
 $("formSess").station.addEventListener("change",()=>{ applyPriceHint(); autoSum(); });
 $("formSess").kwh.addEventListener("input",autoSum);
 $("formSess").byn.addEventListener("input",()=>{ bynTouched=true; });
+
+/* ---------- fill-ups (plug-in hybrid) ---------- */
+let editingFuel=null, fuelBynTouched=false;
+function fuelPrice(name){ const f=S.fuel.filter(x=>x.station===name&&x.liters>0).sort((a,b)=>a.ts<b.ts?1:-1)[0]; return f?f.byn/f.liters:null; }
+function fuelHint(){ const f=$("formFuel"), p=fuelPrice(f.station.value.trim()), h=$("fuelHint"); h.hidden=p==null; if(p!=null) h.textContent=`Последняя цена здесь — ${fmt(p)} ${cur()} за литр. Сумма посчитается сама.`; }
+function fuelAutoSum(){ const f=$("formFuel"); if(fuelBynTouched) return; const p=fuelPrice(f.station.value.trim()), l=num(f.liters.value); if(p!=null&&l!=null&&l>0) f.byn.value=fmt(l*p); }
+function showFuelSug(){
+  const f=$("formFuel");
+  suggest(f.station,$("fuelSug"),S.fuel.map(x=>({name:x.station,ts:x.ts})),
+    n=>{ const p=fuelPrice(n); return p==null?"":`${fmt(p)} ${cur()}/л`; },
+    ()=>{ fuelHint(); fuelAutoSum(); f.liters.focus(); });
+}
+function openFuel(x){
+  const f=$("formFuel"); f.reset(); editingFuel=x?x.id:null;
+  $("fuelTitle").textContent=x?"Заправка":"Новая заправка"; $("btnFuelDel").hidden=!x; disarm($("btnFuelDel"));
+  f.ts.value=x?x.ts.slice(0,16):nowLocal(); f.station.value=x?.station||"";
+  f.liters.value=x?String(x.liters).replace(".",","):""; f.byn.value=x?String(x.byn).replace(".",","):"";
+  f.odo.value=x?.odo??""; f.full.checked=x?!!x.full:true;
+  fuelBynTouched=!!x; fuelHint();
+  $("dlgFuel").showModal();
+}
+$("btnAddFuel").addEventListener("click",()=>openFuel(null));
+$("formFuel").station.addEventListener("focus",showFuelSug);
+$("formFuel").station.addEventListener("blur",()=>{ $("fuelSug").hidden=true; });
+$("formFuel").station.addEventListener("input",()=>{ fuelHint(); fuelAutoSum(); showFuelSug(); });
+$("formFuel").liters.addEventListener("input",fuelAutoSum);
+$("formFuel").byn.addEventListener("input",()=>{ fuelBynTouched=true; });
+$("formFuel").addEventListener("submit",async e=>{
+  e.preventDefault(); if(!db) return;
+  const f=e.target, liters=num(f.liters.value), byn=num(f.byn.value);
+  if(liters===null||liters<=0){ toast("Укажите, сколько литров залито"); f.liters.focus(); return; }
+  if(byn===null||byn<0){ toast(`Укажите сумму в ${cur()}`); f.byn.focus(); return; }
+  const doc={...kept(S.fuel,editingFuel), ts:f.ts.value, station:f.station.value.trim(), liters, byn, odo:num(f.odo.value), full:f.full.checked};
+  try{ await (editingFuel?db.collection("fuel").doc(editingFuel):db.collection("fuel").doc()).set(doc); $("dlgFuel").close(); toast(editingFuel?"Изменения сохранены":"Заправка сохранена"); }
+  catch(err){ toast("Не сохранилось. Повторите"); }
+});
+armConfirm($("btnFuelDel"), async()=>{ if(!editingFuel||!db) return; await db.collection("fuel").doc(editingFuel).delete(); $("dlgFuel").close(); toast("Заправка удалена"); });
 
 /* ---------- Excel (.xlsx) without libraries: a zip of a few XML files, stored uncompressed ---------- */
 const XLSX_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -1297,7 +1513,10 @@ function exportSheets(){
     ...S.costs.slice().sort((a,b)=>(a.date||"")<(b.date||"")?-1:1).map(c=>[c.date?{date:c.date}:null,c.note||"Расход",kindText(c),r3(c.byn),c.odo])];
   const odo=[["Дата и время","Одометр, км","Запас хода, км"],
     ...S.odoLog.filter(x=>x.date).map(x=>({...x,ts:localStamp(x.date)})).sort(byTs).map(x=>[{date:x.ts||""},x.odo,x.range])];
+  const fuel=[["Дата и время","АЗС","Литры",`Сумма, ${cur()}`,`${cur()} за литр`,"Одометр, км","Полный бак"],
+    ...S.fuel.slice().sort(byTs).map(f=>[{date:f.ts},f.station||"",r3(f.liters),r3(f.byn),f.liters?r3(f.byn/f.liters):null,f.odo,f.full?"да":""])];
   return [{name:"Зарядки",rows:charges,widths:[17,24,16,14,12,14,13,10,22]},
+          ...(S.fuel.length?[{name:"Заправки",rows:fuel,widths:[17,22,10,12,12,13,11]}]:[]),
           {name:"Расходы",rows:costs,widths:[12,28,16,12,12]},
           {name:"Пробег",rows:odo,widths:[17,13,15]}];
 }
@@ -1312,7 +1531,7 @@ $("btnJson").addEventListener("click",async()=>{
   if(!downloads) return;
   if(DEMO){ toast(NOT_IN_DEMO); return; }
   const strip = a => a.map(({id,...d})=>({id,...d}));
-  const data={exportedAt:new Date().toISOString(), settings:S.settings, current:S.current, sessions:strip(S.sessions), odo:strip(S.odoLog), refunds:strip(S.refunds), costs:strip(S.costs), reminders:strip(S.reminders)};
+  const data={exportedAt:new Date().toISOString(), settings:S.settings, current:S.current, sessions:strip(S.sessions), fuel:strip(S.fuel), odo:strip(S.odoLog), refunds:strip(S.refunds), costs:strip(S.costs), reminders:strip(S.reminders)};
   try{ await downloads.save({filename:`zaryadki-backup-${localDate(new Date())}.json`, data:JSON.stringify(data,null,2)});
     await db.doc("meta/backup").set({date:new Date().toISOString()}); toast("Копия сохранена"); }
   catch(err){ if(err&&err.code!=="declined") toast("Не получилось сохранить файл"); }
@@ -1346,10 +1565,11 @@ $("fileImport").addEventListener("change",async e=>{
       docs[`${c}/${id}`]=d; n++; });
     return n; };
   const nSess=put("sessions",data.sessions,["kwh","byn","odo","socTo","kwhBat","socFrom"],s=>validTs(s.ts)?{...s,kwh:s.kwh??0,byn:s.byn??0}:null);
+  put("fuel",data.fuel,["liters","byn","odo"],f=>validTs(f.ts)?{...f,liters:f.liters??0,byn:f.byn??0,full:!!f.full}:null);
   put("odo",data.odo,["odo","range"]); put("refunds",data.refunds,["byn"]);
   put("costs",data.costs,["byn","odo","periodMonths","lifeKm"]); put("reminders",data.reminders,["everyKm","lastOdo","everyMonths"]);
   const settings=cleanRecord(data.settings,["startOdo","startRange","capKwh","carCons"]);
-  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; if(curCode(settings.currency)!==settings.currency) delete settings.currency; docs["meta/settings"]=settings; }
+  if(settings){ if(!/^\d{4}-\d{2}-\d{2}$/.test(settings.purchaseDate)) delete settings.purchaseDate; if(curCode(settings.currency)!==settings.currency) delete settings.currency; if(settings.powertrain!=="phev"&&settings.powertrain!=="ev") delete settings.powertrain; docs["meta/settings"]=settings; }
   const current=cleanRecord(data.current,["odo","range"]);
   if(current) docs["meta/current"]=current;
   docs["meta/backup"]={date:data.exportedAt||new Date().toISOString()};
@@ -1370,8 +1590,8 @@ $("fileImport").addEventListener("change",async e=>{
 let pendingImport=null;
 $("formImport").addEventListener("submit",e=>{ e.preventDefault(); const p=pendingImport; pendingImport=null; $("dlgImport").close(); if(p) applyImport(p.docs,p.done,true); });
 $("dlgImport").addEventListener("close",()=>{ pendingImport=null; });
-const COLL={sessions:()=>S.sessions, costs:()=>S.costs, reminders:()=>S.reminders, odo:()=>S.odoLog, refunds:()=>S.refunds};
-const COUNT_WORDS={sessions:["зарядка","зарядки","зарядок"], costs:["расход","расхода","расходов"], reminders:["напоминание","напоминания","напоминаний"],
+const COLL={sessions:()=>S.sessions, fuel:()=>S.fuel, costs:()=>S.costs, reminders:()=>S.reminders, odo:()=>S.odoLog, refunds:()=>S.refunds};
+const COUNT_WORDS={sessions:["зарядка","зарядки","зарядок"], fuel:["заправка","заправки","заправок"], costs:["расход","расхода","расходов"], reminders:["напоминание","напоминания","напоминаний"],
   odo:["замер пробега","замера пробега","замеров пробега"], refunds:["возврат за поездку","возврата за поездки","возвратов за поездки"]};
 const phoneCounts=()=>Object.fromEntries(Object.entries(COLL).map(([c,get])=>[c,get().length]));
 const countText=(counts,none="нет записей")=>Object.keys(COUNT_WORDS).filter(c=>counts[c]).map(c=>`${counts[c]} ${plural(counts[c],...COUNT_WORDS[c])}`).join(", ")||none;
@@ -1568,6 +1788,8 @@ const XORDER=["ts","kwh","byn","station","type","odo","soc","bat"];
 // the same charge, entered by hand at another time or rounded a kopek differently: same kWh, and the same odometer
 // or the same day with the sum within 5 kopeks (a file and a manual entry rarely agree to the minute)
 const sameCharge=(a,b)=>Math.abs(a.kwh-b.kwh)<=0.05 && ((a.odo!=null&&b.odo!=null&&Math.round(a.odo)===Math.round(b.odo)) || (String(a.ts).slice(0,10)===String(b.ts).slice(0,10)&&Math.abs((a.byn||0)-(b.byn||0))<=0.05));
+// the same fill-up from another app: same litres, and the same odometer or the same day with the sum within 5 kopeks
+const sameFill=(a,b)=>Math.abs(a.liters-b.liters)<=0.05 && ((a.odo!=null&&b.odo!=null&&Math.round(a.odo)===Math.round(b.odo)) || (String(a.ts).slice(0,10)===String(b.ts).slice(0,10)&&Math.abs((a.byn||0)-(b.byn||0))<=0.05));
 let xi=null;   // the file being imported: {fileName, sheets, sheet, header, data, map, timeCol, format, result}
 function openTableImport(fileName,sheets){
   sheets=sheets.filter(sh=>sh.rows.some(r=>r&&r.filter(v=>cellText(v)||typeof v==="number").length>=2));
@@ -1589,13 +1811,18 @@ function pickSheet(i){
   renderXImport();
 }
 function xRows(){
-  const m=xi.map, have=S.sessions.filter(s=>s.kwh!=null), add=[]; let dup=0, fuel=0, bad=0, us=0;
+  const m=xi.map, have=S.sessions.filter(s=>s.kwh!=null), add=[], addF=[], hyb=HYB(); let dup=0, fuel=0, bad=0, us=0;
   xi.data.forEach(r=>{ const g=k=>m[k]==null?null:r[m[k]];
     let tsv=g("ts");
     if(xi.timeCol>=0&&xi.timeCol!==m.ts&&typeof tsv==="string"&&!/\d:\d/.test(tsv)) tsv+=" "+cellText(r[xi.timeCol]);
     const ts=cellTs(tsv), kwh=cellNum(g("kwh"),xi.dot), byn=cellNum(g("byn"),xi.dot), type=cellType(g("type"));
     if(!ts&&kwh==null) return;                       // an empty line or a total row
-    if(type==="fuel"){ fuel++; return; }
+    if(type==="fuel"){   // a hybrid takes fuel rows as fill-ups (the quantity column holds litres)
+      if(!hyb){ fuel++; return; }
+      if(!ts||kwh==null||kwh<=0||byn==null||byn<0){ bad++; return; }
+      const fo=cellNum(g("odo"),xi.dot), fr={ts, station:cellText(g("station")), liters:r3(kwh), byn:Math.round(byn*100)/100, odo:fo!=null?Math.round(fo):null, full:cellSoc(g("soc"))===100};
+      if(S.fuel.some(e=>sameFill(e,fr))||addF.some(e=>sameFill(e,fr))){ dup++; return; }
+      addF.push(fr); return; }
     if(!ts||kwh==null||kwh<=0||byn==null||byn<0){ bad++;
       const md=cellText(tsv).match(/^(\d{1,2})[./-](\d{1,2})[./-]/); if(!ts&&md&&Number(md[2])>12&&Number(md[1])<=12) us++;   // 10/13/2026
       return; }
@@ -1603,7 +1830,7 @@ function xRows(){
     const s={ts, station:cellText(g("station")), kwh:r3(kwh), byn:Math.round(byn*100)/100, type:type||"dc", odo:odo!=null?Math.round(odo):null, socTo:cellSoc(g("soc")), kwhBat:bat!=null&&bat>0?r3(bat):null};
     if(have.some(e=>sameCharge(e,s))||add.some(e=>sameCharge(e,s))){ dup++; return; }
     add.push(s); });
-  return {add,dup,fuel,bad,us};
+  return {add,addF,dup,fuel,bad,us};
 }
 function renderXImport(){
   const sh=xi.sheets[xi.sheet];
@@ -1612,36 +1839,37 @@ function renderXImport(){
   $("xiSheet").innerHTML=xi.sheets.map((x,i)=>`<option value="${i}"${i===xi.sheet?" selected":""}>${xmlEsc(x.name)}</option>`).join("");
   const opts=c=>`<option value="">— нет —</option>`+xi.header.map((h,i)=>h?`<option value="${i}"${c===i?" selected":""}>${xmlEsc(h)}</option>`:"").join("");
   $("xiMap").innerHTML=XORDER.map(k=>{ const fd=XFIELDS.find(x=>x.k===k); return `<label>${fd.l}${fd.req?" *":""}<select id="xmap-${k}" data-k="${k}">${opts(xi.map[k])}</select></label>`; }).join("");
-  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],dup:0,fuel:0,bad:0,us:0}:xRows();
+  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],addF:[],dup:0,fuel:0,bad:0,us:0}:xRows();
   xi.result=r;
   const pv=$("xiPreview"); pv.innerHTML="";
   r.add.slice(0,3).forEach(x=>{ const d=document.createElement("div");
     d.innerHTML=`<span></span><b>${fmt(x.kwh,1)} кВт·ч · ${fmt(x.byn)} ${cur()}</b>`;
     d.querySelector("span").textContent=`${new Date(x.ts.slice(0,10)+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"})} ${x.ts.slice(11,16)}${x.station?" · "+x.station:""}`;
     pv.appendChild(d); });
-  let txt=`Будет добавлено: ${r.add.length} ${plural(r.add.length,"зарядка","зарядки","зарядок")}${r.dup?`, уже есть: ${r.dup}`:""}.`;
-  if(r.fuel) txt+=` ${r.fuel} ${plural(r.fuel,"строка","строки","строк")} с топливом ${plural(r.fuel,"пропущена","пропущены","пропущено")} — заправки появятся в режиме гибрида.`;
+  let txt=`Будет добавлено: ${r.add.length} ${plural(r.add.length,"зарядка","зарядки","зарядок")}${r.addF.length?` и ${r.addF.length} ${plural(r.addF.length,"заправка","заправки","заправок")}`:""}${r.dup?`, уже есть: ${r.dup}`:""}.`;
+  if(r.fuel) txt+=` ${r.fuel} ${plural(r.fuel,"строка","строки","строк")} с топливом ${plural(r.fuel,"пропущена","пропущены","пропущено")} — чтобы загрузить заправки, включите в настройках «Гибрид с розеткой».`;
   if(r.bad) txt+=` Без даты, кВт·ч или суммы: ${r.bad} — ${plural(r.bad,"пропущена","пропущены","пропущено")}.`;
   if(r.us) txt+=" Похоже, часть дат в американском формате (месяц/день) — такие строки не загружаются.";
   if(xi.map.type==null&&r.add.length) txt+=" Колонка с типом не выбрана — все зарядки будут DC, а строки с топливом не отличить.";
   $("xiSummary").textContent=missing?"Выберите колонки с датой, кВт·ч и суммой.":txt;
-  $("btnXImportOk").disabled=!r.add.length;
-  $("btnXImportOk").textContent=r.add.length?`Добавить ${r.add.length}`:"Добавить";
+  const nAll=r.add.length+r.addF.length;
+  $("btnXImportOk").disabled=!nAll;
+  $("btnXImportOk").textContent=nAll?`Добавить ${nAll}`:"Добавить";
 }
 $("xiMap").addEventListener("change",e=>{ const sel=e.target.closest("select[data-k]"); if(sel){ xi.map[sel.dataset.k]=sel.value===""?null:Number(sel.value); renderXImport(); } });
 $("xiSheet").addEventListener("change",e=>pickSheet(Number(e.target.value)));
 $("dlgXImport").addEventListener("close",()=>{ xi=null; });
 $("formXImport").addEventListener("submit",e=>{
-  e.preventDefault(); if(!xi||!xi.result||!xi.result.add.length) return;
-  const add=xi.result.add, firstRun=!S.configured;
+  e.preventDefault(); if(!xi||!xi.result||!(xi.result.add.length||xi.result.addF.length)) return;
+  const add=xi.result.add, addF=xi.result.addF, firstRun=!S.configured;
   $("dlgXImport").close();
-  rememberUndo(!!(S.sessions.length||S.costs.length||S.odoLog.length||S.reminders.length||S.configured));
-  try{ db.setMany(add.map(x=>[`sessions/${LocalDB.newId()}`,x])); }
+  rememberUndo(!!(S.sessions.length||S.fuel.length||S.costs.length||S.odoLog.length||S.reminders.length||S.configured));
+  try{ db.setMany([...add.map(x=>[`sessions/${LocalDB.newId()}`,x]), ...addF.map(x=>[`fuel/${LocalDB.newId()}`,x])]); }
   catch(err){ toast("Не получилось сохранить — не хватает места"); return; }
-  toast(`Добавлено: ${add.length} ${plural(add.length,"зарядка","зарядки","зарядок")}`);
+  toast(`Добавлено: ${add.length} ${plural(add.length,"зарядка","зарядки","зарядок")}${addF.length?` и ${addF.length} ${plural(addF.length,"заправка","заправки","заправок")}`:""}`);
   offerUndo("Зарядки добавлены");
   if(firstRun){   // nothing set up yet: suggest the start of tracking from the first imported charge
-    const first=add.slice().sort((a,b)=>a.ts<b.ts?-1:1)[0];
+    const first=[...add,...addF].sort((a,b)=>a.ts<b.ts?-1:1)[0];
     openSettings(); const f=$("formSet"); f.purchaseDate.value=first.ts.slice(0,10); f.startOdo.value=first.odo??"";
   }
 });
@@ -1689,6 +1917,7 @@ setTab("overview");
   db.doc("meta/backup").onSnapshot(snap=>{ S.backup=snap.exists?snap.data():null; render(); }, onErr);
   db.collection("costs").onSnapshot(snap=>{ S.costs=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
   db.collection("reminders").onSnapshot(snap=>{ S.reminders=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
+  db.collection("fuel").onSnapshot(snap=>{ S.fuel=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
   db.collection("odo").onSnapshot(snap=>{ S.odoLog=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
   db.collection("refunds").onSnapshot(snap=>{ S.refunds=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
   db.doc("meta/current").onSnapshot(snap=>{ S.current=snap.exists?snap.data():null; render(); }, onErr);
