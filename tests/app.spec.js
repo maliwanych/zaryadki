@@ -938,6 +938,142 @@ test.describe("импорт из Excel и CSV", () => {
   });
 });
 
+test.describe("режим гибрида с розеткой", () => {
+  // Вымышленный гибрид: 3 заправки (первая и последняя — «полный бак»), 2 зарядки между ними, 1 000 км от бака до бака
+  const HYB = {
+    exportedAt: "2026-08-06T10:00:00.000Z",
+    settings: { carName: "Гибрид", purchaseDate: "2026-07-01", startOdo: 10000, powertrain: "phev" },
+    sessions: [
+      { id: "c1", ts: "2026-07-10T20:00", station: "Дом", kwh: 50, byn: 15, type: "ac" },
+      { id: "c2", ts: "2026-07-25T21:00", station: "Дом", kwh: 40, byn: 12, type: "ac" },
+    ],
+    fuel: [
+      { id: "f1", ts: "2026-07-01T09:00", station: "АЗС у дома", liters: 40, byn: 100, odo: 10000, full: true },
+      { id: "f2", ts: "2026-07-20T10:00", station: "АЗС на трассе", liters: 20, byn: 52, odo: 10600, full: false },
+      { id: "f3", ts: "2026-08-05T11:00", station: "АЗС у дома", liters: 30, byn: 78, odo: 11000, full: true },
+    ],
+  };
+  const docs = page => page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs);
+
+  test("настройка: «Гибрид с розеткой» прячет поля электромобиля и сохраняется", async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnStart");
+    const set = page.locator("#dlgSet");
+    await expect(set.locator("[name=capKwh]")).toBeVisible();
+    await page.click("#ptSeg [data-p=phev]");
+    for (const n of ["startRange", "carCons", "capKwh"]) await expect(set.locator(`[name=${n}]`)).toBeHidden();
+    await expect(set).toContainText("зарядили и заправили");
+    await page.fill("#formSet [name=startOdo]", "1000");
+    await page.click("#formSet button[type=submit]");
+    expect((await docs(page))["meta/settings"].powertrain).toBe("phev");
+    await page.click("#btnSettings");
+    await expect(page.locator("#ptSeg [data-p=phev]")).toHaveAttribute("aria-pressed", "true");
+    await page.click("#ptSeg [data-p=ev]");
+    await expect(set.locator("[name=capKwh]")).toBeVisible();
+  });
+
+  test("обзор: цена от полного бака до полного, литры и кВт·ч на 100 км пути, доля электричества", async ({ page }) => {
+    await page.goto("./");
+    await importJson(page, HYB);
+    await expect(page.locator("#regLabel")).toHaveText("Потрачено на энергию");
+    expect(num(await page.locator("#regByn").getAttribute("aria-label"))).toBeCloseTo(257, 2);   // 27 зарядки + 230 бензин
+    await expect(page.locator("#eSplit")).toContainText("зарядки 27,00");
+    await expect(page.locator("#eSplit")).toContainText("бензин 230,00");
+    // окно f1 → f3: бензин 52 + 78, зарядки 15 + 12 = 157 BYN на 1 000 км
+    await expect(page.locator("#fPer100")).toHaveText("15,7");
+    await expect(page.locator("#fCons")).toHaveText("11%");          // 27 из 257 — электричество
+    await expect(page.locator("#fPrice")).toHaveText("5,0 л");       // 50 л на 1 000 км
+    await expect(page.locator("#fKm")).toHaveText("9,0 кВт·ч");      // 90 кВт·ч на 1 000 км
+    await expect(page.locator("#fKwh")).toHaveText("1 000");         // км проехано
+    await expect(page.locator(".figs")).toContainText("денег — на электричество");
+    await expect(page.locator("#perNote")).toContainText("от полного бака до полного: 1 отрезок, 1 000 км");
+    await expect(page.locator("#f2fSec")).toBeHidden();               // «реальный запас» гибриду не показываем
+    await page.click("#btnOdo");
+    await expect(page.locator("#formOdo [name=range]")).toBeHidden(); // запас хода гибриду не нужен
+  });
+
+  test("пока полных баков меньше двух — «≈ по всем записям»", async ({ page }) => {
+    await page.goto("./");
+    await importJson(page, { ...HYB, fuel: HYB.fuel.map(f => ({ ...f, full: f.id === "f1" })) });
+    await expect(page.locator("#fPer100")).toHaveText("≈25,7");      // все деньги 257 на все 1 000 км
+    await expect(page.locator("#perNote")).toContainText("две заправки «полный бак»");
+  });
+
+  test("кнопки «+ Зарядка» и «+ Заправка», сумма по цене литра, список «Зарядки и заправки» с фильтром", async ({ page }) => {
+    await page.goto("./");
+    await importJson(page, HYB);
+    await expect(page.locator("#btnAdd")).toHaveText("+ Зарядка");
+    await expect(page.locator("#btnAddFuel")).toBeVisible();
+    await page.click("#btnAddFuel");
+    const f = page.locator("#formFuel");
+    await expect(f.locator("[name=full]")).toBeChecked();
+    await f.locator("[name=station]").focus();
+    await expect(page.locator("#fuelSug button").first()).toContainText("АЗС у дома");   // последняя АЗС — наверху
+    await page.locator("#fuelSug button", { hasText: "АЗС у дома" }).click();
+    await expect(page.locator("#fuelHint")).toContainText("2,60");                         // 78 BYN за 30 л
+    await f.locator("[name=liters]").fill("10");
+    await expect(f.locator("[name=byn]")).toHaveValue("26,00");
+    await f.locator("[name=odo]").fill("11200");
+    await page.click("#btnSaveFuel");
+    const fuel = Object.entries(await docs(page)).filter(([k]) => k.startsWith("fuel/")).map(([, v]) => v);
+    expect(fuel).toHaveLength(4);
+    expect(fuel.find(x => x.odo === 11200)).toMatchObject({ station: "АЗС у дома", liters: 10, byn: 26, full: true });
+    await page.click("[data-tab=sessions]");
+    await expect(page.locator("#listTitle")).toHaveText("Зарядки и заправки");
+    await expect(page.locator("#azsStats")).toContainText("АЗС на трассе");
+    await expect(page.locator("#list .sess")).toHaveCount(6);
+    await page.click("#listPills button:has-text('Заправки')");
+    await expect(page.locator("#list .sess")).toHaveCount(4);
+    await expect(page.locator("#list .sess").first()).toContainText("бензин");
+    await page.locator("#list .sess").first().click();                                    // правка и удаление заправки
+    await expect(page.locator("#fuelTitle")).toHaveText("Заправка");
+    await page.click("#btnFuelDel"); await page.click("#btnFuelDel");
+    await expect(page.locator("#list .sess")).toHaveCount(3);
+  });
+
+  test("график и месяц: «Потрачено» двумя цветами, литры на 100 км пути", async ({ page }) => {
+    await page.goto("./");
+    await importJson(page, HYB);
+    await expect(page.locator("#chartPills button")).toHaveText(["BYN/100 км", "Потрачено", "л/100 км пути"]);
+    await page.click("#chartPills button:has-text('Потрачено')");
+    await expect(page.locator("#chartArea .stk i.fuel").first()).toBeAttached();
+    await page.locator("#chartArea .chart-bars button").first().click();
+    await expect(page.locator("#chartSel")).toContainText("бензин");
+    await page.click("#btnAllMonths");
+    const jul = page.locator(".month", { hasText: "Июль 2026" });
+    await expect(jul).toContainText("денег — на электричество");
+    await expect(jul).toContainText("бензина на 100 км пути");
+  });
+
+  test("копия и Excel: заправки и тип машины сохраняются", async ({ page }) => {
+    await page.goto("./");
+    await importJson(page, HYB);
+    const [json] = await Promise.all([page.waitForEvent("download"), page.click("#btnJson")]);
+    const saved = JSON.parse(fs.readFileSync(await json.path(), "utf8"));
+    expect(saved.settings.powertrain).toBe("phev");
+    expect(saved.fuel).toHaveLength(3);
+    expect(saved.fuel.find(x => x.id === "f3")).toMatchObject({ liters: 30, byn: 78, odo: 11000, full: true });
+    const [x] = await Promise.all([page.waitForEvent("download"), page.click("#btnXlsx")]);
+    const files = readStoredZip(fs.readFileSync(await x.path()));
+    expect([...files["xl/workbook.xml"].matchAll(/<sheet name="([^"]+)"/g)].map(m => m[1])).toEqual(["Зарядки", "Заправки", "Расходы", "Пробег"]);
+    expect((files["xl/worksheets/sheet2.xml"].match(/<row /g) || []).length).toBe(4);
+    // непонятный тип машины в копии — электромобиль
+    await importJson(page, { ...HYB, settings: { ...HYB.settings, powertrain: "rocket" } });
+    await page.click("#btnImportOk");
+    expect((await docs(page))["meta/settings"].powertrain).toBeUndefined();
+  });
+
+  test("импорт «Моей машины» в режиме гибрида: строки с бензином становятся заправками", async ({ page }) => {
+    await page.goto("./");
+    await importJson(page, { settings: { carName: "Гибрид", purchaseDate: "2026-09-01", startOdo: 3500, powertrain: "phev" }, sessions: [] });
+    await page.setInputFiles("#fileImport", path.join(__dirname, "fixtures", "moya-mashina-sample.xlsx"));
+    await expect(page.locator("#dlgXImport")).toContainText("Будет добавлено: 5 зарядок и 1 заправка");
+    await page.click("#btnXImportOk");
+    const fuel = Object.entries(await docs(page)).filter(([k]) => k.startsWith("fuel/")).map(([, v]) => v);
+    expect(fuel).toEqual([{ ts: "2026-09-28T12:10", station: "", liters: 20, byn: 52, odo: 3985, full: false }]);
+  });
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
