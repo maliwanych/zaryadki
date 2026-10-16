@@ -1565,7 +1565,9 @@ const XFIELDS=[
   {k:"soc", l:"% после / полный", re:/% после|полный|full|soc/i},
 ];
 const XORDER=["ts","kwh","byn","station","type","odo","soc","bat"];
-const sKey=s=>`${String(s.ts).slice(0,16)}|${Number(s.kwh).toFixed(2)}|${Number(s.byn).toFixed(2)}`;
+// the same charge, entered by hand at another time or rounded a kopek differently: same kWh, and the same odometer
+// or the same day with the sum within 5 kopeks (a file and a manual entry rarely agree to the minute)
+const sameCharge=(a,b)=>Math.abs(a.kwh-b.kwh)<=0.05 && ((a.odo!=null&&b.odo!=null&&Math.round(a.odo)===Math.round(b.odo)) || (String(a.ts).slice(0,10)===String(b.ts).slice(0,10)&&Math.abs((a.byn||0)-(b.byn||0))<=0.05));
 let xi=null;   // the file being imported: {fileName, sheets, sheet, header, data, map, timeCol, format, result}
 function openTableImport(fileName,sheets){
   sheets=sheets.filter(sh=>sh.rows.some(r=>r&&r.filter(v=>cellText(v)||typeof v==="number").length>=2));
@@ -1587,7 +1589,7 @@ function pickSheet(i){
   renderXImport();
 }
 function xRows(){
-  const m=xi.map, have=new Set(S.sessions.map(sKey)), seen=new Set(), add=[]; let dup=0, fuel=0, bad=0, us=0;
+  const m=xi.map, have=S.sessions.filter(s=>s.kwh!=null), add=[]; let dup=0, fuel=0, bad=0, us=0;
   xi.data.forEach(r=>{ const g=k=>m[k]==null?null:r[m[k]];
     let tsv=g("ts");
     if(xi.timeCol>=0&&xi.timeCol!==m.ts&&typeof tsv==="string"&&!/\d:\d/.test(tsv)) tsv+=" "+cellText(r[xi.timeCol]);
@@ -1599,8 +1601,8 @@ function xRows(){
       return; }
     const odo=cellNum(g("odo"),xi.dot), bat=cellNum(g("bat"),xi.dot);
     const s={ts, station:cellText(g("station")), kwh:r3(kwh), byn:Math.round(byn*100)/100, type:type||"dc", odo:odo!=null?Math.round(odo):null, socTo:cellSoc(g("soc")), kwhBat:bat!=null&&bat>0?r3(bat):null};
-    const k=sKey(s); if(have.has(k)||seen.has(k)){ dup++; return; }
-    seen.add(k); add.push(s); });
+    if(have.some(e=>sameCharge(e,s))||add.some(e=>sameCharge(e,s))){ dup++; return; }
+    add.push(s); });
   return {add,dup,fuel,bad,us};
 }
 function renderXImport(){
