@@ -1087,6 +1087,9 @@ test.describe("режим гибрида с розеткой", () => {
     await page.click("#btnXImportOk");
     const fuel = Object.entries(await docs(page)).filter(([k]) => k.startsWith("fuel/")).map(([, v]) => v);
     expect(fuel).toEqual([{ ts: "2026-09-28T12:10", station: "", liters: 20, byn: 52, odo: 3985, full: false }]);
+  });
+});
+
 test.describe("удаление всех данных", () => {
   const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker") || '{"docs":{}}').docs);
 
