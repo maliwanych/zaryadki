@@ -938,6 +938,45 @@ test.describe("импорт из Excel и CSV", () => {
   });
 });
 
+test.describe("удаление всех данных", () => {
+  const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker") || '{"docs":{}}').docs);
+
+  test("в настройках: окно с цифрами, удаление двумя нажатиями, «Вернуть как было»", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnSettings");
+    await page.click("#btnWipe");
+    const dlg = page.locator("#dlgWipe");
+    await expect(dlg).toBeVisible();
+    await expect(dlg).toContainText("7 зарядок");
+    await expect(dlg).toContainText("настройки машины");
+    await expect(page.locator("#btnWipeBackup")).toBeVisible();          // предлагаем сначала сохранить копию
+    await page.click("#btnWipeOk");
+    await expect(page.locator("#btnWipeOk")).toHaveText("Точно удалить всё?");
+    expect(Object.keys(await stored(page)).length).toBeGreaterThan(0);   // одно нажатие ничего не удаляет
+    await page.click("#btnWipeOk");
+    await expect(dlg).toBeHidden();
+    await expect(page.locator("#welcome")).toBeVisible();
+    await expect(page.locator("#fKwh")).toHaveText("0,0");
+    expect(await stored(page)).toEqual({});
+    await expect(page.locator("#undoBanner")).toContainText("Данные удалены");
+    await page.click("#btnUndo");
+    await expect(page.locator("#carName")).toHaveText(backup.settings.carName);
+    expect(Object.keys(await stored(page)).filter(k => k.startsWith("sessions/"))).toHaveLength(backup.sessions.length);
+  });
+
+  test("на пустом телефоне и в примере кнопки нет", async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnStart");
+    await expect(page.locator("#btnWipe")).toBeHidden();
+    await page.click("#dlgSet [data-close]");
+    await page.click("#btnDemo");
+    await expect(page.locator("#demoBanner")).toBeVisible();
+    await page.click("#btnSettings");
+    await expect(page.locator("#btnWipe")).toBeHidden();
+  });
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];

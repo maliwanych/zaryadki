@@ -157,6 +157,8 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .btn.primary{background:var(--ink);color:var(--plate);border-color:var(--ink)}
 .btn.danger{color:var(--red);flex:0 0 auto;padding:13px 16px}
 .btn:disabled{opacity:.5}
+.btn.wipe{background:var(--red);border-color:var(--red);color:#fff}
+.btn.wipe-link{width:100%;margin-top:10px;background:none;color:var(--red)}
 
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--plate);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
 .toast.on{opacity:1}
@@ -384,7 +386,8 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <p class="hint full">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
     <p class="hint full">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
   </div>
-  <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после загрузки пропадут" hidden style="width:100%;margin-top:14px"></button>
+  <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
+  <button type="button" class="btn wipe-link" id="btnWipe" hidden>Удалить все данные</button>
   <div class="sheet-actions">
     <button type="button" class="btn" data-close>Отмена</button>
     <button type="submit" class="btn primary">Сохранить</button>
@@ -466,6 +469,18 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
 </form></dialog>
 
+<dialog id="dlgWipe"><form class="sheet" id="formWipe" method="dialog">
+  <h2>Удалить все данные?</h2>
+  <p class="imp" id="wipeWhat"></p>
+  <p class="imp">Удалятся все записи и настройки на этом телефоне — приложение станет как новое. Если передумаете, сразу нажмите «Вернуть как было» (или в настройках, пока не загрузите другой файл).</p>
+  <p class="hint">Надёжнее сначала сохранить резервную копию.</p>
+  <button type="button" class="btn" id="btnWipeBackup" style="width:100%;margin-top:6px">Сохранить резервную копию</button>
+  <div class="sheet-actions">
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="button" class="btn wipe" id="btnWipeOk" data-label="Удалить всё" data-armed-label="Точно удалить всё?">Удалить всё</button>
+  </div>
+</form></dialog>
+
 <dialog id="dlgImport"><form class="sheet" id="formImport" method="dialog">
   <h2>Заменить данные копией?</h2>
   <p class="imp" id="impCopy"></p>
@@ -510,7 +525,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.13";
+const APP_VERSION = "1.0.14";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1099,8 +1114,10 @@ $("formOdo").addEventListener("submit",async e=>{
 
 function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency);
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
-  if(u) b.dataset.label=`Вернуть данные до последней загрузки (${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})})`;
-  disarm(b); $("dlgSet").showModal(); }
+  if(u) b.dataset.label=`Вернуть данные, как было до ${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}, ${new Date(u.at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}`;
+  disarm(b);
+  $("btnWipe").hidden = DEMO || !(S.configured || Object.values(phoneCounts()).some(Boolean));
+  $("dlgSet").showModal(); }
 $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
 $("formSet").addEventListener("submit",async e=>{
@@ -1383,7 +1400,7 @@ async function undoImport(){
   const u=readUndo(); if(!u) return;
   db.replaceAll(JSON.parse(u.data).docs||{});   // throws on a full storage → the caller shows a toast
   localStorage.removeItem(UNDO_KEY);
-  $("undoBanner").hidden=true; toast("Данные возвращены, как были до загрузки");
+  $("undoBanner").hidden=true; toast("Данные возвращены");
 }
 $("btnUndo").addEventListener("click",()=>undoImport().catch(()=>toast("Не получилось вернуть. Повторите")));
 armConfirm($("btnUndoImport"), async()=>{ try{ await undoImport(); }catch(e){ toast("Не получилось вернуть. Повторите"); return; } $("dlgSet").close(); });
@@ -1625,6 +1642,22 @@ $("formXImport").addEventListener("submit",e=>{
     const first=add.slice().sort((a,b)=>a.ts<b.ts?-1:1)[0];
     openSettings(); const f=$("formSet"); f.purchaseDate.value=first.ts.slice(0,10); f.startOdo.value=first.odo??"";
   }
+});
+
+/* ---------- delete everything (a fresh start); the deleted data stays as the undo copy until the next import ---------- */
+$("btnWipe").addEventListener("click",()=>{
+  if(DEMO) return;
+  $("wipeWhat").textContent=`Сейчас на телефоне: ${countText(phoneCounts(),"записей нет")}${S.configured?", настройки машины":""}.`;
+  disarm($("btnWipeOk")); $("dlgSet").close(); $("dlgWipe").showModal();
+});
+$("btnWipeBackup").addEventListener("click",()=>$("btnJson").click());
+armConfirm($("btnWipeOk"), async()=>{
+  if(DEMO) return;
+  rememberUndo(true);
+  db.replaceAll({});
+  $("dlgWipe").close(); setTab("overview");
+  toast("Все данные удалены");
+  offerUndo("Данные удалены");
 });
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
