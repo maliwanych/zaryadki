@@ -109,6 +109,10 @@ section{margin-top:28px}
 .sug button:first-child{border-top:0}
 .sug span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sug small{color:var(--muted);font-size:13px;white-space:nowrap}
+.xi-prev{display:flex;flex-direction:column;gap:4px;margin:12px 0 10px;font-size:13px}
+.xi-prev div{display:flex;justify-content:space-between;gap:10px;background:var(--plate);border-radius:8px;padding:8px 10px}
+.xi-prev span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.xi-prev b{white-space:nowrap;font-weight:600}
 .f2f-big{font-size:30px;font-weight:700;line-height:1.2}
 .f2f-cons{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:14px}
 
@@ -211,7 +215,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <main>
   <div class="banner" id="updBanner" hidden><span>Доступна новая версия</span><button class="link-btn" id="btnUpdate">Обновить</button></div>
   <div class="banner" id="demoBanner" hidden><span>Это пример с вымышленными данными. Пробуйте что угодно — при выходе всё сотрётся.</span><button class="link-btn" id="btnDemoExit">Выйти</button></div>
-  <div class="banner" id="undoBanner" hidden><span>Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
+  <div class="banner" id="undoBanner" hidden><span id="undoText">Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
   <div class="banner ios" id="iosHint" hidden><span id="iosText"></span><button class="link-btn" id="btnIosHint">Понятно</button></div>
   <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
   <h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1>
@@ -315,10 +319,11 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <button class="link-btn" id="btnXlsx" hidden>Выгрузить в Excel</button>
     <button class="link-btn" id="btnJson" hidden>Резервная копия</button>
     <button class="link-btn" id="btnImport">Загрузить копию</button>
+    <button class="link-btn" id="btnXImport">Импорт из Excel</button>
     <button class="link-btn" id="btnSettings">Настройки</button>
   </div>
   <p class="ver tabbed" data-tab="overview">Версия <span id="appVer"></span> · данные хранятся только на этом устройстве · <a href="privacy.html">Конфиденциальность</a></p>
-  <input type="file" id="fileImport" accept="application/json,.json" hidden>
+  <input type="file" id="fileImport" accept="application/json,.json,.xlsx,.csv,text/csv" hidden>
 </main>
 
 <div class="fab"><button id="btnAdd" disabled>Добавить зарядку</button></div>
@@ -447,6 +452,20 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
 </form></dialog>
 
+<dialog id="dlgXImport"><form class="sheet" id="formXImport" method="dialog">
+  <h2>Импорт зарядок</h2>
+  <p class="imp" id="xiSource"></p>
+  <label id="xiSheetWrap" hidden style="margin-bottom:12px">Лист<select id="xiSheet"></select></label>
+  <div class="fgrid" id="xiMap"></div>
+  <div class="xi-prev" id="xiPreview"></div>
+  <p class="imp" id="xiSummary"></p>
+  <p class="hint">Зарядки добавятся к уже записанным, повторы (та же дата, кВт·ч и сумма) пропускаются. Передумаете — «Вернуть как было».</p>
+  <div class="sheet-actions">
+    <button type="button" class="btn" data-close>Отмена</button>
+    <button type="submit" class="btn primary" id="btnXImportOk">Добавить</button>
+  </div>
+</form></dialog>
+
 <dialog id="dlgImport"><form class="sheet" id="formImport" method="dialog">
   <h2>Заменить данные копией?</h2>
   <p class="imp" id="impCopy"></p>
@@ -491,7 +510,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.12";
+const APP_VERSION = "1.0.13";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -518,7 +537,8 @@ function LocalDB(key){
   const collection=c=>({ path:c, doc:id=>doc(`${c}/${id||LocalDB.newId()}`), onSnapshot:(n)=>sub(()=>{ const d=colDocs(c); n({docs:d,size:d.length,empty:!d.length}); }) });
   // another tab or window changed the data
   window.addEventListener("storage",e=>{ if(e.key===key){ docs=load(); notify(); } });
-  return { doc, collection, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
+  return { doc, collection, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); },
+    setMany:(pairs)=>{ const prev={...docs}; pairs.forEach(([p,d])=>{ docs[p]=JSON.parse(JSON.stringify(d)); }); try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
 }
 LocalDB.newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
@@ -1079,7 +1099,7 @@ $("formOdo").addEventListener("submit",async e=>{
 
 function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency);
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
-  if(u) b.dataset.label=`Вернуть данные до загрузки копии (${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})})`;
+  if(u) b.dataset.label=`Вернуть данные до последней загрузки (${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})})`;
   disarm(b); $("dlgSet").showModal(); }
 $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
@@ -1254,7 +1274,7 @@ const localStamp=iso=>{ const d=new Date(iso); return isNaN(d)?null:`${localDate
 function exportSheets(){
   const byTs=(a,b)=>(a.ts||"")<(b.ts||"")?-1:1;
   const charges=[["Дата и время","Станция","Тип","кВт·ч из сети",`Сумма, ${cur()}`,`${cur()} за кВт·ч`,"Одометр, км","% после","Приняла машина, кВт·ч"],
-    ...S.sessions.slice().sort(byTs).map(s=>[{date:s.ts},s.station||"",glitch(s)?"сбой старта":isFree(s)?"бесплатно":(TYPES[s.type]||TYPES.dc).name,r3(s.kwh),r3(s.byn),s.kwh?r3(s.byn/s.kwh):null,s.odo,s.socTo,r3(s.kwhBat)])];
+    ...S.sessions.slice().sort(byTs).map(s=>[{date:s.ts},s.station||"",(TYPES[s.type]||TYPES.dc).name,r3(s.kwh),r3(s.byn),s.kwh?r3(s.byn/s.kwh):null,s.odo,s.socTo,r3(s.kwhBat)])];
   const kindText=c=>c.kind==="period"?`за ${c.periodMonths||12} мес.`:c.kind==="km"&&c.lifeKm?`на ${fmtInt(c.lifeKm)} км`:KIND[c.kind||"run"];
   const costs=[["Дата","Что","Вид расхода",`Сумма, ${cur()}`,"Пробег, км"],
     ...S.costs.slice().sort((a,b)=>(a.date||"")<(b.date||"")?-1:1).map(c=>[c.date?{date:c.date}:null,c.note||"Расход",kindText(c),r3(c.byn),c.odo])];
@@ -1287,10 +1307,19 @@ const NOT_IN_DEMO="В примере это недоступно — выйди�
 const openImport=()=>{ if(DEMO){ toast(NOT_IN_DEMO); return; } $("fileImport").click(); };
 $("btnImport").addEventListener("click",openImport);
 $("btnImport1").addEventListener("click",openImport);
+$("btnXImport").addEventListener("click",openImport);
 $("fileImport").addEventListener("change",async e=>{
   const file=e.target.files[0]; e.target.value=""; if(!file) return;
-  let data;
-  try{ data=JSON.parse(await file.text()); }catch(err){ toast("Это не файл резервной копии"); return; }
+  let data, buf;
+  try{ buf=await file.arrayBuffer(); }catch(err){ toast("Не получилось прочитать файл"); return; }
+  const head=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
+  if(head[0]===0x50&&head[1]===0x4B){   // "PK": a zip, so Excel
+    try{ openTableImport(file.name, await readXlsx(buf)); }catch(err){ toast("Не получилось прочитать файл Excel"); }
+    return;
+  }
+  const text=decodeText(new Uint8Array(buf));
+  if(!/^\s*[{[]/.test(text)){ openTableImport(file.name,[{name:file.name,rows:parseCsv(text)}]); return; }
+  try{ data=JSON.parse(text); }catch(err){ toast("Это не файл резервной копии"); return; }
   if(!data || !Array.isArray(data.sessions)){ toast("В файле нет зарядок — это не резервная копия трекера"); return; }
   const docs={}; let skipped=0;
   const put=(c,arr,numFields,fix=d=>d)=>{ if(!Array.isArray(arr)) return 0; let n=0;
@@ -1331,21 +1360,29 @@ const countText=(counts,none="нет записей")=>Object.keys(COUNT_WORDS).
 
 /* ---------- undo the last import: the replaced data is kept on this phone until the next import ---------- */
 const UNDO_KEY=DB_KEY+"-undo";
-function applyImport(docs,done,keepUndo){
+function rememberUndo(keep){
   try{ const before=localStorage.getItem(DB_KEY);
-    if(keepUndo&&before) localStorage.setItem(UNDO_KEY, JSON.stringify({at:new Date().toISOString(), data:before}));
+    if(keep&&before) localStorage.setItem(UNDO_KEY, JSON.stringify({at:new Date().toISOString(), data:before}));
     else localStorage.removeItem(UNDO_KEY);
   }catch(e){ try{ localStorage.removeItem(UNDO_KEY); }catch(_){} }   // no room for the undo copy: an older one must not stay behind
+}
+function offerUndo(text){
+  if(!readUndo()) return;
+  $("undoText").textContent=text; $("undoBanner").hidden=false;
+  clearTimeout(offerUndo._t); offerUndo._t=setTimeout(()=>{ $("undoBanner").hidden=true; },10000);
+}
+function applyImport(docs,done,keepUndo){
+  rememberUndo(keepUndo);
   try{ db.replaceAll(docs); toast(done); }
   catch(err){ toast("Не получилось сохранить — не хватает места"); return; }
-  if(keepUndo&&readUndo()){ $("undoBanner").hidden=false; clearTimeout(applyImport._t); applyImport._t=setTimeout(()=>{ $("undoBanner").hidden=true; },10000); }
+  if(keepUndo) offerUndo("Копия загружена");
 }
 function readUndo(){ if(DEMO) return null; try{ const u=JSON.parse(localStorage.getItem(UNDO_KEY)||"null"); return u&&u.data?u:null; }catch(e){ return null; } }
 async function undoImport(){
   const u=readUndo(); if(!u) return;
   db.replaceAll(JSON.parse(u.data).docs||{});   // throws on a full storage → the caller shows a toast
   localStorage.removeItem(UNDO_KEY);
-  $("undoBanner").hidden=true; toast("Данные возвращены, как были до загрузки копии");
+  $("undoBanner").hidden=true; toast("Данные возвращены, как были до загрузки");
 }
 $("btnUndo").addEventListener("click",()=>undoImport().catch(()=>toast("Не получилось вернуть. Повторите")));
 armConfirm($("btnUndoImport"), async()=>{ try{ await undoImport(); }catch(e){ toast("Не получилось вернуть. Повторите"); return; } $("dlgSet").close(); });
@@ -1409,6 +1446,176 @@ $("btnDemo").addEventListener("click",()=>{
   location.reload();
 });
 $("btnDemoExit").addEventListener("click",()=>{ try{ localStorage.removeItem(DEMO_KEY); localStorage.removeItem(DEMO_AT); sessionStorage.removeItem(DEMO_KEY); }catch(e){} location.reload(); });
+
+/* ---------- import charges from Excel or CSV: any app's columns are matched by the person; ours and «Моя машина» match themselves ---------- */
+const inflateRaw=async d=>new Uint8Array(await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+async function unzip(buf){   // ArrayBuffer → {name: Uint8Array}; stored and deflated entries
+  const u8=new Uint8Array(buf), dv=new DataView(buf), out={};
+  let e=-1; for(let i=u8.length-22;i>=Math.max(0,u8.length-65557);i--) if(dv.getUint32(i,true)===0x06054b50){ e=i; break; }
+  if(e<0) throw new Error("not a zip");
+  let p=dv.getUint32(e+16,true);
+  for(let k=dv.getUint16(e+10,true);k>0;k--){
+    if(dv.getUint32(p,true)!==0x02014b50) throw new Error("bad zip");
+    const method=dv.getUint16(p+10,true), size=dv.getUint32(p+20,true), nl=dv.getUint16(p+28,true), el=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lo=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(u8.subarray(p+46,p+46+nl));
+    const start=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true), data=u8.subarray(start,start+size);
+    if(method===0) out[name]=data; else if(method===8) out[name]=await inflateRaw(data);
+    p+=46+nl+el+cl;
+  }
+  return out;
+}
+async function readXlsx(buf){   // → [{name, rows}]; a cell is a string, a number, a boolean or {serial} for a date
+  const f=await unzip(buf), xml=n=>new DOMParser().parseFromString(f[n]?new TextDecoder().decode(f[n]):"<x/>","application/xml");
+  const all=(el,tag)=>[...el.getElementsByTagName(tag)], text=el=>all(el,"t").map(t=>t.textContent).join("");
+  const shared=f["xl/sharedStrings.xml"]?all(xml("xl/sharedStrings.xml"),"si").map(text):[];
+  // date styles: built-in date formats, or custom ones with d/m/y outside quotes and [brackets]
+  const dateXf=[];
+  if(f["xl/styles.xml"]){ const st=xml("xl/styles.xml"), custom={};
+    all(st,"numFmt").forEach(n=>{ custom[n.getAttribute("numFmtId")]=n.getAttribute("formatCode")||""; });
+    const xfs=st.getElementsByTagName("cellXfs")[0];
+    if(xfs) all(xfs,"xf").forEach(x=>{ const id=Number(x.getAttribute("numFmtId")||0), code=(custom[id]||"").replace(/"[^"]*"|\[[^\]]*\]/g,"");
+      dateXf.push((id>=14&&id<=22)||(id>=45&&id<=47)||/[dmy]/i.test(code)); }); }
+  const rels={}; all(xml("xl/_rels/workbook.xml.rels"),"Relationship").forEach(r=>{ rels[r.getAttribute("Id")]=r.getAttribute("Target")||""; });
+  return all(xml("xl/workbook.xml"),"sheet").map(sh=>{
+    const t=rels[sh.getAttribute("r:id")]||"", path=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.\//,""), rows=[];
+    if(f[path]) all(xml(path),"row").forEach(row=>{ const r=[];
+      all(row,"c").forEach(c=>{ const col=(c.getAttribute("r")||"").replace(/\d+/g,"").split("").reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0)-1;
+        const type=c.getAttribute("t"), v=c.getElementsByTagName("v")[0], raw=v?v.textContent:"";
+        let val=null;
+        if(type==="s") val=shared[Number(raw)]??null;
+        else if(type==="inlineStr") val=text(c);
+        else if(type==="str") val=raw;
+        else if(type==="b") val=raw==="1";
+        else if(type!=="e"&&raw!==""){ const n=Number(raw); val=dateXf[Number(c.getAttribute("s")||0)]?{serial:n}:n; }
+        if(col>=0) r[col]=val; });
+      rows.push(r); });
+    return {name:sh.getAttribute("name")||"", rows};
+  });
+}
+// CSV: UTF-8, else Windows-1251 (older Russian programs); the delimiter is whichever splits the first line most
+function decodeText(u8){ try{ return new TextDecoder("utf-8",{fatal:true}).decode(u8).replace(/^\uFEFF/,""); }catch(e){ return new TextDecoder("windows-1251").decode(u8); } }
+function parseCsv(text){
+  const first=text.split(/\r?\n/,1)[0]||"", delim=[";","\t",","].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){ cell+='"'; i++; } else q=false; } else cell+=ch; continue; }
+    if(ch==='"') q=true;
+    else if(ch===delim){ row.push(cell); cell=""; }
+    else if(ch==="\n"||ch==="\r"){ if(ch==="\r"&&text[i+1]==="\n") i++; row.push(cell); rows.push(row); row=[]; cell=""; }
+    else cell+=ch; }
+  if(cell!==""||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+const cellText=v=>v==null||typeof v==="object"?"":String(v).trim();
+const cellNum=v=>typeof v==="number"?v:typeof v==="string"?num(v):null;
+function cellTs(v){   // Excel date or text like 13.10.2026 7:37 / 2026-10-13 07:37 → "YYYY-MM-DDTHH:MM"
+  if(typeof v==="number"||(v&&typeof v==="object")){ const n=typeof v==="number"?v:v.serial; if(!(n>20000&&n<80000)) return null;   // Excel days, 1954…2119
+    const d=new Date(Math.round((n-25569)*864e5)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; }
+  const s=cellText(v); let m, y, mo, d, h, mi;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/))) [y,mo,d,h,mi]=[m[1],m[2],m[3],m[4],m[5]];
+  else if((m=s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})(?:[ ,T]+(\d{1,2}):(\d{2}))?/))) [d,mo,y,h,mi]=[m[1],m[2],m[3].length===2?"20"+m[3]:m[3],m[4],m[5]];
+  else return null;
+  [y,mo,d,h,mi]=[y,mo,d,h||0,mi||0].map(Number);
+  if(mo<1||mo>12||d<1||d>31||h>23||mi>59) return null;
+  return `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}`;
+}
+const FUEL_RE=/аи|ai-?\d|бенз|petrol|gasol|дизел|diesel|\bдт\b|газ|lpg|cng|^9[2-8]\b/i;
+function cellType(v){ const s=cellText(v).toLowerCase(); if(!s) return null;
+  if(FUEL_RE.test(s)) return "fuel";
+  if(/трасс|hwy|highway|магистр/.test(s)) return "hwy";
+  if(/^dc|\bdc\b|fast|быстр|ccs|chademo|gb\/?t|постоян/.test(s)) return "dc";
+  if(/^ac|\bac\b|slow|медлен|перемен|type ?2|тип ?2/.test(s)) return "ac";
+  return null; }
+function cellSoc(v){
+  if(typeof v==="number") return v>=0&&v<=100?v:null;
+  if(typeof v==="boolean") return v?100:null;
+  const s=cellText(v).toLowerCase(); if(!s) return null;
+  const n=num(s.replace("%","")); if(n!=null) return n>=0&&n<=100?n:null;
+  return /^(да|yes|y|true|\+|полный|full)$/.test(s)?100:null; }
+// the order matters for guessing: «Приняла машина, кВт·ч» is taken before plain «кВт·ч»
+const XFIELDS=[
+  {k:"ts", l:"Дата и время", req:true, re:/дата|date|когда|время/i},
+  {k:"bat", l:"Приняла машина, кВт·ч", re:/приняла|в батаре|battery/i},
+  {k:"kwh", l:"Заряжено, кВт·ч", req:true, re:/квт|kwh|количеств|объ[её]м|энерги/i},
+  {k:"byn", l:"Сумма", req:true, re:/сумм|стоимост|итого|amount|cost|total|оплат|^(byn|₽|rub|руб)/i},
+  {k:"station", l:"Станция", re:/станц|азс|место|адрес|station|location/i},
+  {k:"type", l:"Тип (AC / DC / трасса)", re:/^тип|вид топлив|вид зарядк|^type|fuel/i},
+  {k:"odo", l:"Пробег, км", re:/пробег|одометр|odo|mileage/i},
+  {k:"soc", l:"% после / полный", re:/% после|полный|full|soc/i},
+];
+const XORDER=["ts","kwh","byn","station","type","odo","soc","bat"];
+const sKey=s=>`${String(s.ts).slice(0,16)}|${Number(s.kwh).toFixed(2)}|${Number(s.byn).toFixed(2)}`;
+let xi=null;   // the file being imported: {fileName, sheets, sheet, header, data, map, timeCol, format, result}
+function openTableImport(fileName,sheets){
+  sheets=sheets.filter(sh=>sh.rows.some(r=>r&&r.filter(v=>cellText(v)||typeof v==="number").length>=2));
+  if(!sheets.length){ toast("В файле не нашлось таблицы"); return; }
+  xi={fileName, sheets};
+  pickSheet(Math.max(0,sheets.findIndex(sh=>/зарядк|заправк|charg/i.test(sh.name))));
+  $("dlgXImport").showModal();
+}
+function pickSheet(i){
+  const rows=xi.sheets[i].rows.map(r=>r||[]), hi=rows.findIndex(r=>r.filter(v=>cellText(v)).length>=2);   // the header: first row with two texts
+  Object.assign(xi,{sheet:i, header:(rows[hi]||[]).map(cellText), data:rows.slice(hi+1), map:{}});
+  const used=new Set();
+  XFIELDS.forEach(fd=>{ const c=xi.header.findIndex((h,ci)=>h&&!used.has(ci)&&fd.re.test(h)); if(c>=0){ xi.map[fd.k]=c; used.add(c); } });
+  xi.timeCol=xi.header.findIndex(h=>/^(время|time)$/i.test(h));   // date and time in separate columns (our old CSV)
+  const h=xi.header.map(x=>x.toLowerCase());
+  xi.format=h.includes("вид топлива")&&h.includes("количество")&&h.includes("полный бак")?"«Моя машина»":h.includes("квт·ч из сети")?"этого приложения":null;
+  renderXImport();
+}
+function xRows(){
+  const m=xi.map, have=new Set(S.sessions.map(sKey)), seen=new Set(), add=[]; let dup=0, fuel=0, bad=0;
+  xi.data.forEach(r=>{ const g=k=>m[k]==null?null:r[m[k]];
+    let tsv=g("ts");
+    if(xi.timeCol>=0&&xi.timeCol!==m.ts&&typeof tsv==="string"&&!/\d:\d/.test(tsv)) tsv+=" "+cellText(r[xi.timeCol]);
+    const ts=cellTs(tsv), kwh=cellNum(g("kwh")), byn=cellNum(g("byn")), type=cellType(g("type"));
+    if(!ts&&kwh==null) return;                       // an empty line or a total row
+    if(type==="fuel"){ fuel++; return; }
+    if(!ts||kwh==null||kwh<=0||byn==null||byn<0){ bad++; return; }
+    const odo=cellNum(g("odo")), bat=cellNum(g("bat"));
+    const s={ts, station:cellText(g("station")), kwh:r3(kwh), byn:Math.round(byn*100)/100, type:type||"dc", odo:odo!=null?Math.round(odo):null, socTo:cellSoc(g("soc")), kwhBat:bat!=null&&bat>0?r3(bat):null};
+    const k=sKey(s); if(have.has(k)||seen.has(k)){ dup++; return; }
+    seen.add(k); add.push(s); });
+  return {add,dup,fuel,bad};
+}
+function renderXImport(){
+  const sh=xi.sheets[xi.sheet];
+  $("xiSource").textContent=`Файл «${xi.fileName}»${xi.sheets.length>1?"":`, лист «${sh.name}»`}`+(xi.format?` — формат ${xi.format}, колонки сопоставлены сами.`:" — незнакомый формат, проверьте колонки ниже.");
+  $("xiSheetWrap").hidden=xi.sheets.length<2;
+  $("xiSheet").innerHTML=xi.sheets.map((x,i)=>`<option value="${i}"${i===xi.sheet?" selected":""}>${xmlEsc(x.name)}</option>`).join("");
+  const opts=c=>`<option value="">— нет —</option>`+xi.header.map((h,i)=>h?`<option value="${i}"${c===i?" selected":""}>${xmlEsc(h)}</option>`:"").join("");
+  $("xiMap").innerHTML=XORDER.map(k=>{ const fd=XFIELDS.find(x=>x.k===k); return `<label>${fd.l}${fd.req?" *":""}<select id="xmap-${k}" data-k="${k}">${opts(xi.map[k])}</select></label>`; }).join("");
+  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],dup:0,fuel:0,bad:0}:xRows();
+  xi.result=r;
+  const pv=$("xiPreview"); pv.innerHTML="";
+  r.add.slice(0,3).forEach(x=>{ const d=document.createElement("div");
+    d.innerHTML=`<span></span><b>${fmt(x.kwh,1)} кВт·ч · ${fmt(x.byn)} ${cur()}</b>`;
+    d.querySelector("span").textContent=`${new Date(x.ts.slice(0,10)+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"})} ${x.ts.slice(11,16)}${x.station?" · "+x.station:""}`;
+    pv.appendChild(d); });
+  let txt=`Будет добавлено: ${r.add.length} ${plural(r.add.length,"зарядка","зарядки","зарядок")}${r.dup?`, уже есть: ${r.dup}`:""}.`;
+  if(r.fuel) txt+=` ${r.fuel} ${plural(r.fuel,"строка","строки","строк")} с бензином ${plural(r.fuel,"пропущена","пропущены","пропущено")} — заправки появятся в режиме гибрида.`;
+  if(r.bad) txt+=` Без даты, кВт·ч или суммы: ${r.bad} — ${plural(r.bad,"пропущена","пропущены","пропущено")}.`;
+  $("xiSummary").textContent=missing?"Выберите колонки с датой, кВт·ч и суммой.":txt;
+  $("btnXImportOk").disabled=!r.add.length;
+  $("btnXImportOk").textContent=r.add.length?`Добавить ${r.add.length}`:"Добавить";
+}
+$("xiMap").addEventListener("change",e=>{ const sel=e.target.closest("select[data-k]"); if(sel){ xi.map[sel.dataset.k]=sel.value===""?null:Number(sel.value); renderXImport(); } });
+$("xiSheet").addEventListener("change",e=>pickSheet(Number(e.target.value)));
+$("dlgXImport").addEventListener("close",()=>{ xi=null; });
+$("formXImport").addEventListener("submit",e=>{
+  e.preventDefault(); if(!xi||!xi.result||!xi.result.add.length) return;
+  const add=xi.result.add, firstRun=!S.configured;
+  $("dlgXImport").close();
+  rememberUndo(!!(S.sessions.length||S.costs.length||S.odoLog.length||S.reminders.length||S.configured));
+  try{ db.setMany(add.map(x=>[`sessions/${LocalDB.newId()}`,x])); }
+  catch(err){ toast("Не получилось сохранить — не хватает места"); return; }
+  toast(`Добавлено: ${add.length} ${plural(add.length,"зарядка","зарядки","зарядок")}`);
+  offerUndo("Зарядки добавлены");
+  if(firstRun){   // nothing set up yet: suggest the start of tracking from the first imported charge
+    const first=add.slice().sort((a,b)=>a.ts<b.ts?-1:1)[0];
+    openSettings(); const f=$("formSet"); f.purchaseDate.value=first.ts.slice(0,10); f.startOdo.value=first.odo??"";
+  }
+});
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){
