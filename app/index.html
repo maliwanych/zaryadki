@@ -513,6 +513,10 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <p class="imp" id="xiSource"></p>
   <label id="xiSheetWrap" hidden style="margin-bottom:12px">Лист<select id="xiSheet"></select></label>
   <div class="fgrid" id="xiMap"></div>
+  <div id="xiTypeWrap" hidden style="margin-top:12px"><label style="margin-bottom:4px">Тип для этих зарядок</label>
+    <div class="seg" id="xiTypeSeg"><button type="button" data-t="ac">AC</button><button type="button" data-t="dc">DC город</button><button type="button" data-t="hwy">Трасса</button></div>
+    <p class="hint" id="xiTypeHint" style="margin-top:4px"></p>
+  </div>
   <div class="xi-prev" id="xiPreview"></div>
   <p class="imp" id="xiSummary"></p>
   <p class="hint">Зарядки добавятся к уже записанным, повторы (та же дата, кВт·ч и сумма) пропускаются. Передумаете — «Вернуть как было».</p>
@@ -579,7 +583,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.15";
+const APP_VERSION = "1.0.16";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1775,11 +1779,11 @@ function cellSoc(v){
 // the order matters for guessing: «Приняла машина, кВт·ч» is taken before plain «кВт·ч»; «Цена за кВт·ч» is never kWh or the sum
 const PRICE_RE=/цена|price|per |за\s*(1\s*)?(квт|kwh|л\b|литр)|\//i;
 const XFIELDS=[
-  {k:"ts", l:"Дата и время", req:true, re:/дата|date|когда|время/i},
+  {k:"ts", l:"Дата и время", req:true, re:/дата|date|когда|время|start|начал|^time/i, not:/end|оконч|конец|duration|длительн/i},
   {k:"bat", l:"Приняла машина, кВт·ч", re:/приняла|в батаре|battery/i},
   {k:"kwh", l:"Заряжено, кВт·ч", req:true, re:/квт|kwh|количеств|объ[её]м|энерги/i, not:PRICE_RE},
-  {k:"byn", l:"Сумма", req:true, re:/сумм|стоимост|итого|amount|cost|total|оплат|^(byn|₽|rub|руб)/i, not:PRICE_RE},
-  {k:"station", l:"Станция", re:/станц|азс|место|адрес|station|location/i},
+  {k:"byn", l:"Сумма", req:true, re:/сумм|стоимост|итого|amount|cost|total|оплат|fee|payment|paid|^(byn|₽|rub|руб)/i, not:PRICE_RE},
+  {k:"station", l:"Станция", re:/станц|азс|место|адрес|station|location|device|charger|зарядн|point/i},
   {k:"type", l:"Тип (AC / DC / трасса)", re:/^тип|топлив|вид зарядк|^type|fuel/i},
   {k:"odo", l:"Пробег, км", re:/пробег|одометр|odo|mileage/i},
   {k:"soc", l:"% после / полный", re:/% после|полный|full|soc/i},
@@ -1803,7 +1807,8 @@ function pickSheet(i){
   Object.assign(xi,{sheet:i, header:(rows[hi]||[]).map(cellText), data:rows.slice(hi+1), map:{}});
   const used=new Set();
   XFIELDS.forEach(fd=>{ const c=xi.header.findIndex((h,ci)=>h&&!used.has(ci)&&fd.re.test(h)&&!(fd.not&&fd.not.test(h))); if(c>=0){ xi.map[fd.k]=c; used.add(c); } });
-  xi.timeCol=xi.header.findIndex(h=>/^(время|time)$/i.test(h));   // date and time in separate columns (our old CSV)
+  xi.timeCol=xi.header.findIndex(h=>/^(время|time)$/i.test(h));
+  xi.defType="ac";   // rows without a type: chosen in the dialog (a charger app's log is usually home AC)   // date and time in separate columns (our old CSV)
   const texts=xi.data.flat().filter(v=>typeof v==="string").map(v=>v.trim());
   xi.dot=texts.some(v=>/^-?\d+\.\d+$/.test(v))&&!texts.some(v=>/^-?\d+,\d{1,2}$/.test(v));
   const h=xi.header.map(x=>x.toLowerCase());
@@ -1811,7 +1816,7 @@ function pickSheet(i){
   renderXImport();
 }
 function xRows(){
-  const m=xi.map, have=S.sessions.filter(s=>s.kwh!=null), add=[], addF=[], hyb=HYB(); let dup=0, fuel=0, bad=0, us=0;
+  const m=xi.map, have=S.sessions.filter(s=>s.kwh!=null), add=[], addF=[], hyb=HYB(); let dup=0, fuel=0, bad=0, us=0, unk=0;
   xi.data.forEach(r=>{ const g=k=>m[k]==null?null:r[m[k]];
     let tsv=g("ts");
     if(xi.timeCol>=0&&xi.timeCol!==m.ts&&typeof tsv==="string"&&!/\d:\d/.test(tsv)) tsv+=" "+cellText(r[xi.timeCol]);
@@ -1827,10 +1832,11 @@ function xRows(){
       const md=cellText(tsv).match(/^(\d{1,2})[./-](\d{1,2})[./-]/); if(!ts&&md&&Number(md[2])>12&&Number(md[1])<=12) us++;   // 10/13/2026
       return; }
     const odo=cellNum(g("odo"),xi.dot), bat=cellNum(g("bat"),xi.dot);
-    const s={ts, station:cellText(g("station")), kwh:r3(kwh), byn:Math.round(byn*100)/100, type:type||"dc", odo:odo!=null?Math.round(odo):null, socTo:cellSoc(g("soc")), kwhBat:bat!=null&&bat>0?r3(bat):null};
+    const s={ts, station:cellText(g("station")), kwh:r3(kwh), byn:Math.round(byn*100)/100, type:type||xi.defType, odo:odo!=null?Math.round(odo):null, socTo:cellSoc(g("soc")), kwhBat:bat!=null&&bat>0?r3(bat):null};
     if(have.some(e=>sameCharge(e,s))||add.some(e=>sameCharge(e,s))){ dup++; return; }
+    if(!type) unk++;
     add.push(s); });
-  return {add,addF,dup,fuel,bad,us};
+  return {add,addF,dup,fuel,bad,us,unk};
 }
 function renderXImport(){
   const sh=xi.sheets[xi.sheet];
@@ -1839,7 +1845,7 @@ function renderXImport(){
   $("xiSheet").innerHTML=xi.sheets.map((x,i)=>`<option value="${i}"${i===xi.sheet?" selected":""}>${xmlEsc(x.name)}</option>`).join("");
   const opts=c=>`<option value="">— нет —</option>`+xi.header.map((h,i)=>h?`<option value="${i}"${c===i?" selected":""}>${xmlEsc(h)}</option>`:"").join("");
   $("xiMap").innerHTML=XORDER.map(k=>{ const fd=XFIELDS.find(x=>x.k===k); return `<label>${fd.l}${fd.req?" *":""}<select id="xmap-${k}" data-k="${k}">${opts(xi.map[k])}</select></label>`; }).join("");
-  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],addF:[],dup:0,fuel:0,bad:0,us:0}:xRows();
+  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],addF:[],dup:0,fuel:0,bad:0,us:0,unk:0}:xRows();
   xi.result=r;
   const pv=$("xiPreview"); pv.innerHTML="";
   r.add.slice(0,3).forEach(x=>{ const d=document.createElement("div");
@@ -1850,7 +1856,10 @@ function renderXImport(){
   if(r.fuel) txt+=` ${r.fuel} ${plural(r.fuel,"строка","строки","строк")} с топливом ${plural(r.fuel,"пропущена","пропущены","пропущено")} — чтобы загрузить заправки, включите в настройках «Гибрид с розеткой».`;
   if(r.bad) txt+=` Без даты, кВт·ч или суммы: ${r.bad} — ${plural(r.bad,"пропущена","пропущены","пропущено")}.`;
   if(r.us) txt+=" Похоже, часть дат в американском формате (месяц/день) — такие строки не загружаются.";
-  if(xi.map.type==null&&r.add.length) txt+=" Колонка с типом не выбрана — все зарядки будут DC, а строки с топливом не отличить.";
+  if(xi.map.type==null&&HYB()&&r.add.length) txt+=" Без колонки с типом заправки не отличить от зарядок.";
+  $("xiTypeWrap").hidden=!r.unk;
+  $("xiTypeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===xi.defType));
+  $("xiTypeHint").textContent=xi.map.type==null?"В файле нет колонки с типом — выберите, какие это были зарядки.":`У ${r.unk} ${plural(r.unk,"зарядки","зарядок","зарядок")} тип не распознан — выберите для них.`;
   $("xiSummary").textContent=missing?"Выберите колонки с датой, кВт·ч и суммой.":txt;
   const nAll=r.add.length+r.addF.length;
   $("btnXImportOk").disabled=!nAll;
@@ -1858,6 +1867,7 @@ function renderXImport(){
 }
 $("xiMap").addEventListener("change",e=>{ const sel=e.target.closest("select[data-k]"); if(sel){ xi.map[sel.dataset.k]=sel.value===""?null:Number(sel.value); renderXImport(); } });
 $("xiSheet").addEventListener("change",e=>pickSheet(Number(e.target.value)));
+$("xiTypeSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-t]"); if(b&&xi){ xi.defType=b.dataset.t; renderXImport(); } });
 $("dlgXImport").addEventListener("close",()=>{ xi=null; });
 $("formXImport").addEventListener("submit",e=>{
   e.preventDefault(); if(!xi||!xi.result||!(xi.result.add.length||xi.result.addF.length)) return;
