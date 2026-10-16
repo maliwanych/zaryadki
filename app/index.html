@@ -323,7 +323,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <button class="link-btn" id="btnSettings">Настройки</button>
   </div>
   <p class="ver tabbed" data-tab="overview">Версия <span id="appVer"></span> · данные хранятся только на этом устройстве · <a href="privacy.html">Конфиденциальность</a></p>
-  <input type="file" id="fileImport" accept="application/json,.json,.xlsx,.csv,text/csv" hidden>
+  <input type="file" id="fileImport" accept="application/json,.json,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv,text/csv,text/plain" hidden>
 </main>
 
 <div class="fab"><button id="btnAdd" disabled>Добавить зарядку</button></div>
@@ -1314,7 +1314,8 @@ $("fileImport").addEventListener("change",async e=>{
   try{ buf=await file.arrayBuffer(); }catch(err){ toast("Не получилось прочитать файл"); return; }
   const head=new Uint8Array(buf,0,Math.min(2,buf.byteLength));
   if(head[0]===0x50&&head[1]===0x4B){   // "PK": a zip, so Excel
-    try{ openTableImport(file.name, await readXlsx(buf)); }catch(err){ toast("Не получилось прочитать файл Excel"); }
+    try{ openTableImport(file.name, await readXlsx(buf)); }
+    catch(err){ toast(err&&err.message==="no-inflate"?"Этот браузер не открывает Excel — обновите его или сохраните таблицу как CSV":"Не получилось прочитать файл Excel"); }
     return;
   }
   const text=decodeText(new Uint8Array(buf));
@@ -1448,7 +1449,7 @@ $("btnDemo").addEventListener("click",()=>{
 $("btnDemoExit").addEventListener("click",()=>{ try{ localStorage.removeItem(DEMO_KEY); localStorage.removeItem(DEMO_AT); sessionStorage.removeItem(DEMO_KEY); }catch(e){} location.reload(); });
 
 /* ---------- import charges from Excel or CSV: any app's columns are matched by the person; ours and «Моя машина» match themselves ---------- */
-const inflateRaw=async d=>new Uint8Array(await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+const inflateRaw=async d=>{ if(typeof DecompressionStream==="undefined") throw new Error("no-inflate"); return new Uint8Array(await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()); };
 async function unzip(buf){   // ArrayBuffer → {name: Uint8Array}; stored and deflated entries
   const u8=new Uint8Array(buf), dv=new DataView(buf), out={};
   let e=-1; for(let i=u8.length-22;i>=Math.max(0,u8.length-65557);i--) if(dv.getUint32(i,true)===0x06054b50){ e=i; break; }
@@ -1466,21 +1467,21 @@ async function unzip(buf){   // ArrayBuffer → {name: Uint8Array}; stored and d
 }
 async function readXlsx(buf){   // → [{name, rows}]; a cell is a string, a number, a boolean or {serial} for a date
   const f=await unzip(buf), xml=n=>new DOMParser().parseFromString(f[n]?new TextDecoder().decode(f[n]):"<x/>","application/xml");
-  const all=(el,tag)=>[...el.getElementsByTagName(tag)], text=el=>all(el,"t").map(t=>t.textContent).join("");
+  const all=(el,tag)=>[...el.getElementsByTagNameNS("*",tag)], text=el=>all(el,"t").map(t=>t.textContent).join("");
   const shared=f["xl/sharedStrings.xml"]?all(xml("xl/sharedStrings.xml"),"si").map(text):[];
   // date styles: built-in date formats, or custom ones with d/m/y outside quotes and [brackets]
   const dateXf=[];
   if(f["xl/styles.xml"]){ const st=xml("xl/styles.xml"), custom={};
     all(st,"numFmt").forEach(n=>{ custom[n.getAttribute("numFmtId")]=n.getAttribute("formatCode")||""; });
-    const xfs=st.getElementsByTagName("cellXfs")[0];
+    const xfs=st.getElementsByTagNameNS("*","cellXfs")[0];
     if(xfs) all(xfs,"xf").forEach(x=>{ const id=Number(x.getAttribute("numFmtId")||0), code=(custom[id]||"").replace(/"[^"]*"|\[[^\]]*\]/g,"");
       dateXf.push((id>=14&&id<=22)||(id>=45&&id<=47)||/[dmy]/i.test(code)); }); }
   const rels={}; all(xml("xl/_rels/workbook.xml.rels"),"Relationship").forEach(r=>{ rels[r.getAttribute("Id")]=r.getAttribute("Target")||""; });
   return all(xml("xl/workbook.xml"),"sheet").map(sh=>{
-    const t=rels[sh.getAttribute("r:id")]||"", path=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.\//,""), rows=[];
+    const t=rels[sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id")||sh.getAttribute("r:id")]||"", path=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.\//,""), rows=[];
     if(f[path]) all(xml(path),"row").forEach(row=>{ const r=[];
       all(row,"c").forEach(c=>{ const col=(c.getAttribute("r")||"").replace(/\d+/g,"").split("").reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0)-1;
-        const type=c.getAttribute("t"), v=c.getElementsByTagName("v")[0], raw=v?v.textContent:"";
+        const type=c.getAttribute("t"), v=c.getElementsByTagNameNS("*","v")[0], raw=v?v.textContent:"";
         let val=null;
         if(type==="s") val=shared[Number(raw)]??null;
         else if(type==="inlineStr") val=text(c);
@@ -1507,11 +1508,13 @@ function parseCsv(text){
   return rows;
 }
 const cellText=v=>v==null||typeof v==="object"?"":String(v).trim();
-const cellNum=v=>typeof v==="number"?v:typeof v==="string"?num(v):null;
+// dot=true: the file writes decimals with a dot (1,020.75), so commas are thousand separators
+const cellNum=(v,dot)=>typeof v==="number"?v:typeof v!=="string"?null:dot?num(v.replace(/[\s,]/g,"")):num(v);
 function cellTs(v){   // Excel date or text like 13.10.2026 7:37 / 2026-10-13 07:37 → "YYYY-MM-DDTHH:MM"
   if(typeof v==="number"||(v&&typeof v==="object")){ const n=typeof v==="number"?v:v.serial; if(!(n>20000&&n<80000)) return null;   // Excel days, 1954…2119
     const d=new Date(Math.round((n-25569)*864e5)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; }
   const s=cellText(v); let m, y, mo, d, h, mi;
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(s)){ const t=new Date(s); return isNaN(t)?null:localStamp(t.toISOString()); }
   if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/))) [y,mo,d,h,mi]=[m[1],m[2],m[3],m[4],m[5]];
   else if((m=s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})(?:[ ,T]+(\d{1,2}):(\d{2}))?/))) [d,mo,y,h,mi]=[m[1],m[2],m[3].length===2?"20"+m[3]:m[3],m[4],m[5]];
   else return null;
@@ -1519,7 +1522,7 @@ function cellTs(v){   // Excel date or text like 13.10.2026 7:37 / 2026-10-13 07
   if(mo<1||mo>12||d<1||d>31||h>23||mi>59) return null;
   return `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}`;
 }
-const FUEL_RE=/аи|ai-?\d|бенз|petrol|gasol|дизел|diesel|\bдт\b|газ|lpg|cng|^9[2-8]\b/i;
+const FUEL_RE=/аи|ai-?\d|бенз|petrol|gasol|дизел|diesel|(^|[^а-яё])дт([^а-яё]|$)|газ|lpg|cng|^9[2-8]\b/i;
 function cellType(v){ const s=cellText(v).toLowerCase(); if(!s) return null;
   if(FUEL_RE.test(s)) return "fuel";
   if(/трасс|hwy|highway|магистр/.test(s)) return "hwy";
@@ -1532,14 +1535,15 @@ function cellSoc(v){
   const s=cellText(v).toLowerCase(); if(!s) return null;
   const n=num(s.replace("%","")); if(n!=null) return n>=0&&n<=100?n:null;
   return /^(да|yes|y|true|\+|полный|full)$/.test(s)?100:null; }
-// the order matters for guessing: «Приняла машина, кВт·ч» is taken before plain «кВт·ч»
+// the order matters for guessing: «Приняла машина, кВт·ч» is taken before plain «кВт·ч»; «Цена за кВт·ч» is never kWh or the sum
+const PRICE_RE=/цена|price|per |за\s*(1\s*)?(квт|kwh|л\b|литр)|\//i;
 const XFIELDS=[
   {k:"ts", l:"Дата и время", req:true, re:/дата|date|когда|время/i},
   {k:"bat", l:"Приняла машина, кВт·ч", re:/приняла|в батаре|battery/i},
-  {k:"kwh", l:"Заряжено, кВт·ч", req:true, re:/квт|kwh|количеств|объ[её]м|энерги/i},
-  {k:"byn", l:"Сумма", req:true, re:/сумм|стоимост|итого|amount|cost|total|оплат|^(byn|₽|rub|руб)/i},
+  {k:"kwh", l:"Заряжено, кВт·ч", req:true, re:/квт|kwh|количеств|объ[её]м|энерги/i, not:PRICE_RE},
+  {k:"byn", l:"Сумма", req:true, re:/сумм|стоимост|итого|amount|cost|total|оплат|^(byn|₽|rub|руб)/i, not:PRICE_RE},
   {k:"station", l:"Станция", re:/станц|азс|место|адрес|station|location/i},
-  {k:"type", l:"Тип (AC / DC / трасса)", re:/^тип|вид топлив|вид зарядк|^type|fuel/i},
+  {k:"type", l:"Тип (AC / DC / трасса)", re:/^тип|топлив|вид зарядк|^type|fuel/i},
   {k:"odo", l:"Пробег, км", re:/пробег|одометр|odo|mileage/i},
   {k:"soc", l:"% после / полный", re:/% после|полный|full|soc/i},
 ];
@@ -1557,26 +1561,30 @@ function pickSheet(i){
   const rows=xi.sheets[i].rows.map(r=>r||[]), hi=rows.findIndex(r=>r.filter(v=>cellText(v)).length>=2);   // the header: first row with two texts
   Object.assign(xi,{sheet:i, header:(rows[hi]||[]).map(cellText), data:rows.slice(hi+1), map:{}});
   const used=new Set();
-  XFIELDS.forEach(fd=>{ const c=xi.header.findIndex((h,ci)=>h&&!used.has(ci)&&fd.re.test(h)); if(c>=0){ xi.map[fd.k]=c; used.add(c); } });
+  XFIELDS.forEach(fd=>{ const c=xi.header.findIndex((h,ci)=>h&&!used.has(ci)&&fd.re.test(h)&&!(fd.not&&fd.not.test(h))); if(c>=0){ xi.map[fd.k]=c; used.add(c); } });
   xi.timeCol=xi.header.findIndex(h=>/^(время|time)$/i.test(h));   // date and time in separate columns (our old CSV)
+  const texts=xi.data.flat().filter(v=>typeof v==="string").map(v=>v.trim());
+  xi.dot=texts.some(v=>/^-?\d+\.\d+$/.test(v))&&!texts.some(v=>/^-?\d+,\d{1,2}$/.test(v));
   const h=xi.header.map(x=>x.toLowerCase());
   xi.format=h.includes("вид топлива")&&h.includes("количество")&&h.includes("полный бак")?"«Моя машина»":h.includes("квт·ч из сети")?"этого приложения":null;
   renderXImport();
 }
 function xRows(){
-  const m=xi.map, have=new Set(S.sessions.map(sKey)), seen=new Set(), add=[]; let dup=0, fuel=0, bad=0;
+  const m=xi.map, have=new Set(S.sessions.map(sKey)), seen=new Set(), add=[]; let dup=0, fuel=0, bad=0, us=0;
   xi.data.forEach(r=>{ const g=k=>m[k]==null?null:r[m[k]];
     let tsv=g("ts");
     if(xi.timeCol>=0&&xi.timeCol!==m.ts&&typeof tsv==="string"&&!/\d:\d/.test(tsv)) tsv+=" "+cellText(r[xi.timeCol]);
-    const ts=cellTs(tsv), kwh=cellNum(g("kwh")), byn=cellNum(g("byn")), type=cellType(g("type"));
+    const ts=cellTs(tsv), kwh=cellNum(g("kwh"),xi.dot), byn=cellNum(g("byn"),xi.dot), type=cellType(g("type"));
     if(!ts&&kwh==null) return;                       // an empty line or a total row
     if(type==="fuel"){ fuel++; return; }
-    if(!ts||kwh==null||kwh<=0||byn==null||byn<0){ bad++; return; }
-    const odo=cellNum(g("odo")), bat=cellNum(g("bat"));
+    if(!ts||kwh==null||kwh<=0||byn==null||byn<0){ bad++;
+      const md=cellText(tsv).match(/^(\d{1,2})[./-](\d{1,2})[./-]/); if(!ts&&md&&Number(md[2])>12&&Number(md[1])<=12) us++;   // 10/13/2026
+      return; }
+    const odo=cellNum(g("odo"),xi.dot), bat=cellNum(g("bat"),xi.dot);
     const s={ts, station:cellText(g("station")), kwh:r3(kwh), byn:Math.round(byn*100)/100, type:type||"dc", odo:odo!=null?Math.round(odo):null, socTo:cellSoc(g("soc")), kwhBat:bat!=null&&bat>0?r3(bat):null};
     const k=sKey(s); if(have.has(k)||seen.has(k)){ dup++; return; }
     seen.add(k); add.push(s); });
-  return {add,dup,fuel,bad};
+  return {add,dup,fuel,bad,us};
 }
 function renderXImport(){
   const sh=xi.sheets[xi.sheet];
@@ -1585,7 +1593,7 @@ function renderXImport(){
   $("xiSheet").innerHTML=xi.sheets.map((x,i)=>`<option value="${i}"${i===xi.sheet?" selected":""}>${xmlEsc(x.name)}</option>`).join("");
   const opts=c=>`<option value="">— нет —</option>`+xi.header.map((h,i)=>h?`<option value="${i}"${c===i?" selected":""}>${xmlEsc(h)}</option>`:"").join("");
   $("xiMap").innerHTML=XORDER.map(k=>{ const fd=XFIELDS.find(x=>x.k===k); return `<label>${fd.l}${fd.req?" *":""}<select id="xmap-${k}" data-k="${k}">${opts(xi.map[k])}</select></label>`; }).join("");
-  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],dup:0,fuel:0,bad:0}:xRows();
+  const missing=XFIELDS.some(fd=>fd.req&&xi.map[fd.k]==null), r=missing?{add:[],dup:0,fuel:0,bad:0,us:0}:xRows();
   xi.result=r;
   const pv=$("xiPreview"); pv.innerHTML="";
   r.add.slice(0,3).forEach(x=>{ const d=document.createElement("div");
@@ -1593,8 +1601,10 @@ function renderXImport(){
     d.querySelector("span").textContent=`${new Date(x.ts.slice(0,10)+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"short",year:"numeric"})} ${x.ts.slice(11,16)}${x.station?" · "+x.station:""}`;
     pv.appendChild(d); });
   let txt=`Будет добавлено: ${r.add.length} ${plural(r.add.length,"зарядка","зарядки","зарядок")}${r.dup?`, уже есть: ${r.dup}`:""}.`;
-  if(r.fuel) txt+=` ${r.fuel} ${plural(r.fuel,"строка","строки","строк")} с бензином ${plural(r.fuel,"пропущена","пропущены","пропущено")} — заправки появятся в режиме гибрида.`;
+  if(r.fuel) txt+=` ${r.fuel} ${plural(r.fuel,"строка","строки","строк")} с топливом ${plural(r.fuel,"пропущена","пропущены","пропущено")} — заправки появятся в режиме гибрида.`;
   if(r.bad) txt+=` Без даты, кВт·ч или суммы: ${r.bad} — ${plural(r.bad,"пропущена","пропущены","пропущено")}.`;
+  if(r.us) txt+=" Похоже, часть дат в американском формате (месяц/день) — такие строки не загружаются.";
+  if(xi.map.type==null&&r.add.length) txt+=" Колонка с типом не выбрана — все зарядки будут DC, а строки с топливом не отличить.";
   $("xiSummary").textContent=missing?"Выберите колонки с датой, кВт·ч и суммой.":txt;
   $("btnXImportOk").disabled=!r.add.length;
   $("btnXImportOk").textContent=r.add.length?`Добавить ${r.add.length}`:"Добавить";
