@@ -926,6 +926,22 @@ test.describe("импорт из Excel и CSV", () => {
     await expect(page.locator("#dlgXImport")).toBeHidden();
   });
 
+  test("повтором считается та же зарядка, внесённая вручную в другое время и с копейкой разницы", async ({ page }) => {
+    // как на скриншоте владельца: «Дом» 10:33, 49,40 кВт·ч, 17,79 BYN, 9 577 км — и из «Моей машины» 07:37, 17,78 BYN
+    await page.goto("./");
+    await importJson(page, { settings: { carName: "Моя", purchaseDate: "2026-09-01", startOdo: 3000 }, sessions: [
+      { id: "m1", ts: "2026-10-12T10:33", station: "Дом", kwh: 41.5, byn: 14.95, type: "ac", odo: 4630, socTo: 100 },   // тот же пробег
+      { id: "m2", ts: "2026-10-07T20:00", station: "ТЦ", kwh: 30.2, byn: 20.85, type: "dc" },                         // та же дата, сумма ±0,01
+    ] });
+    await page.setInputFiles("#fileImport", MM);
+    const dlg = page.locator("#dlgXImport");
+    await expect(dlg).toContainText("Будет добавлено: 3 зарядки, уже есть: 2");
+    await page.click("#btnXImportOk");
+    const s = await sessions(page);
+    expect(s).toHaveLength(5);
+    expect(s.filter(x => x.station === "Дом")).toHaveLength(1);    // ручная запись осталась, дубля нет
+  });
+
   test("импорт можно отменить", async ({ page }) => {
     await page.goto("./");
     await importBackup(page);
@@ -935,6 +951,45 @@ test.describe("импорт из Excel и CSV", () => {
     await expect(page.locator("#undoBanner")).toContainText("Зарядки добавлены");
     await page.click("#btnUndo");
     expect(await sessions(page)).toHaveLength(backup.sessions.length);
+  });
+});
+
+test.describe("удаление всех данных", () => {
+  const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker") || '{"docs":{}}').docs);
+
+  test("в настройках: окно с цифрами, удаление двумя нажатиями, «Вернуть как было»", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnSettings");
+    await page.click("#btnWipe");
+    const dlg = page.locator("#dlgWipe");
+    await expect(dlg).toBeVisible();
+    await expect(dlg).toContainText("7 зарядок");
+    await expect(dlg).toContainText("настройки машины");
+    await expect(page.locator("#btnWipeBackup")).toBeVisible();          // предлагаем сначала сохранить копию
+    await page.click("#btnWipeOk");
+    await expect(page.locator("#btnWipeOk")).toHaveText("Точно удалить всё?");
+    expect(Object.keys(await stored(page)).length).toBeGreaterThan(0);   // одно нажатие ничего не удаляет
+    await page.click("#btnWipeOk");
+    await expect(dlg).toBeHidden();
+    await expect(page.locator("#welcome")).toBeVisible();
+    await expect(page.locator("#fKwh")).toHaveText("0,0");
+    expect(await stored(page)).toEqual({});
+    await expect(page.locator("#undoBanner")).toContainText("Данные удалены");
+    await page.click("#btnUndo");
+    await expect(page.locator("#carName")).toHaveText(backup.settings.carName);
+    expect(Object.keys(await stored(page)).filter(k => k.startsWith("sessions/"))).toHaveLength(backup.sessions.length);
+  });
+
+  test("на пустом телефоне и в примере кнопки нет", async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnStart");
+    await expect(page.locator("#btnWipe")).toBeHidden();
+    await page.click("#dlgSet [data-close]");
+    await page.click("#btnDemo");
+    await expect(page.locator("#demoBanner")).toBeVisible();
+    await page.click("#btnSettings");
+    await expect(page.locator("#btnWipe")).toBeHidden();
   });
 });
 
