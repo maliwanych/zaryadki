@@ -942,6 +942,37 @@ test.describe("импорт из Excel и CSV", () => {
     expect(s.filter(x => x.station === "Дом")).toHaveLength(1);    // ручная запись осталась, дубля нет
   });
 
+  test("выгрузка домашней зарядки без колонки типа: английские заголовки сами, тип AC/DC выбирается", async ({ page }) => {
+    // вымышленный файл в формате приложения домашней зарядки (как прислали в чате)
+    const csv = "Device Name,SN,Start Time,End Time,Duration,Electricity (kWh),Fee,Authorized\n" +
+      "Wallbox,WB0001,2026-10-01 22:00:00,2026-10-02 05:00:00,07:00:00,30.5,9.15,Yes\n" +
+      "Wallbox,WB0001,2026-10-04 23:10:00,2026-10-05 04:40:00,05:30:00,24.25,7.28,Yes\n";
+    await page.goto("./");
+    await page.setInputFiles("#fileImport", { name: "Charging Records.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    const dlg = page.locator("#dlgXImport");
+    await expect(page.locator("#xmap-ts")).toHaveValue("2");         // Start Time, не End Time и не Duration
+    await expect(page.locator("#xmap-kwh")).toHaveValue("5");
+    await expect(page.locator("#xmap-byn")).toHaveValue("6");        // Fee
+    await expect(page.locator("#xmap-station")).toHaveValue("0");    // Device Name
+    await expect(page.locator("#xiTypeWrap")).toBeVisible();          // колонки с типом нет — выбор для всех строк
+    await expect(page.locator("#xiTypeSeg [data-t=ac]")).toHaveAttribute("aria-pressed", "true");
+    await page.click("#xiTypeSeg [data-t=dc]");
+    await expect(dlg).toContainText("Будет добавлено: 2 зарядки");
+    await page.click("#btnXImportOk");
+    const s = await sessions(page);
+    expect(s.map(x => [x.ts, x.station, x.kwh, x.byn, x.type])).toEqual([
+      ["2026-10-01T22:00", "Wallbox", 30.5, 9.15, "dc"],
+      ["2026-10-04T23:10", "Wallbox", 24.25, 7.28, "dc"],
+    ]);
+  });
+
+  test("выбор типа не мешает, когда колонка типа есть и всё распознано", async ({ page }) => {
+    await page.goto("./");
+    await page.setInputFiles("#fileImport", MM);
+    await expect(page.locator("#dlgXImport")).toBeVisible();
+    await expect(page.locator("#xiTypeWrap")).toBeHidden();
+  });
+
   test("импорт можно отменить", async ({ page }) => {
     await page.goto("./");
     await importBackup(page);
