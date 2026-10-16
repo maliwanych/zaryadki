@@ -798,6 +798,146 @@ test("выгрузка в Excel: настоящий .xlsx, листы, числ�
   expect((odo.match(/<row /g) || []).length).toBe(backup.odo.length + 1);
 });
 
+test.describe("импорт из Excel и CSV", () => {
+  const MM = path.join(__dirname, "fixtures", "moya-mashina-sample.xlsx");   // вымышленный файл в формате «Моей машины»
+  const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const sessions = page => page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem("ev-tracker") || '{"docs":{}}').docs)
+    .filter(([k]) => k.startsWith("sessions/")).map(([, v]) => v).sort((a, b) => (a.ts < b.ts ? -1 : 1)));
+  // кириллица в Windows-1251, как в CSV из старых программ
+  const cp1251 = str => Buffer.from([...str].map(ch => { const c = ch.charCodeAt(0);
+    if (c < 128) return c; if (c >= 0x410 && c <= 0x44f) return c - 0x350; if (c === 0x401) return 0xa8; if (c === 0x451) return 0xb8;
+    throw new Error("нет в cp1251: " + ch); }));
+
+  test("«Моя машина»: распознаётся сама, итог и бензин пропущены, повторно — без дублей", async ({ page }) => {
+    await page.goto("./");
+    await page.setInputFiles("#fileImport", MM);
+    const dlg = page.locator("#dlgXImport");
+    await expect(dlg).toBeVisible();
+    await expect(dlg).toContainText("«Моя машина»");
+    await expect(page.locator("#xmap-ts")).toHaveValue("0");          // колонки сопоставлены сами
+    await expect(page.locator("#xmap-kwh")).toHaveValue("3");
+    await expect(page.locator("#xmap-byn")).toHaveValue("5");
+    await expect(dlg).toContainText("Будет добавлено: 5 зарядок");
+    await expect(dlg).toContainText("1 строка с топливом пропущена");
+    await page.click("#btnXImportOk");
+    await expect(page.locator("#fKwh")).toHaveText("188,0");             // 41,5 + 30,2 + 44 + 47,3 + 25
+    const s = await sessions(page);
+    expect(s).toHaveLength(5);
+    expect(s[0]).toMatchObject({ ts: "2026-09-20T09:05", kwh: 25, byn: 17.25, type: "dc", odo: 3640 });
+    expect(s[1]).toMatchObject({ ts: "2026-09-25T19:20", kwh: 47.3, type: "ac", socTo: 100 });
+    // машина ещё не настроена — предлагаем начало учёта с первой зарядки
+    await expect(page.locator("#dlgSet")).toBeVisible();
+    await expect(page.locator("#formSet [name=purchaseDate]")).toHaveValue("2026-09-20");
+    await expect(page.locator("#formSet [name=startOdo]")).toHaveValue("3640");
+    await page.click("#formSet button[type=submit]");
+    // тот же файл ещё раз — всё уже есть
+    await page.setInputFiles("#fileImport", MM);
+    await expect(dlg).toContainText("Будет добавлено: 0");
+    await expect(dlg).toContainText("уже есть: 5");
+    await expect(page.locator("#btnXImportOk")).toBeDisabled();
+  });
+
+  test("CSV из другого приложения: свои колонки, запятые в числах, Windows-1251", async ({ page }) => {
+    const csv = "Когда;Где;Энергия;Деньги;Км\r\n05.10.2026 10:00;Офис;12,5;0;5000\r\n06.10.2026 20:30;Дом;30;7,5;5100\r\n";
+    await page.goto("./");
+    await page.setInputFiles("#fileImport", { name: "other.csv", mimeType: "text/csv", buffer: cp1251(csv) });
+    const dlg = page.locator("#dlgXImport");
+    await expect(dlg).toBeVisible();
+    await expect(dlg).toContainText("проверьте колонки");
+    await expect(page.locator("#xmap-kwh option", { hasText: "Энергия" })).toHaveCount(1);   // заголовки прочитаны в верной кодировке
+    await page.selectOption("#xmap-ts", { label: "Когда" });
+    await page.selectOption("#xmap-kwh", { label: "Энергия" });
+    await page.selectOption("#xmap-byn", { label: "Деньги" });
+    await page.selectOption("#xmap-station", { label: "Где" });
+    await page.selectOption("#xmap-odo", { label: "Км" });
+    await expect(dlg).toContainText("Будет добавлено: 2 зарядки");
+    await expect(page.locator("#xiPreview")).toContainText("Офис");
+    await page.click("#btnXImportOk");
+    await expect(page.locator("#fKwh")).toHaveText("42,5");
+    const s = await sessions(page);
+    expect(s[0]).toMatchObject({ ts: "2026-10-05T10:00", station: "Офис", kwh: 12.5, byn: 0, odo: 5000 });
+    expect(s[1]).toMatchObject({ ts: "2026-10-06T20:30", station: "Дом", kwh: 30, byn: 7.5 });
+  });
+
+  test("свой файл Excel загружается обратно сам, один в один", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    const [d] = await Promise.all([page.waitForEvent("download"), page.click("#btnXlsx")]);
+    const buffer = fs.readFileSync(await d.path());
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.setInputFiles("#fileImport", { name: "zaryadki.xlsx", mimeType: XLSX, buffer });
+    const dlg = page.locator("#dlgXImport");
+    await expect(dlg).toContainText("этого приложения");
+    await expect(dlg).toContainText(`Будет добавлено: ${backup.sessions.length} зарядок`);
+    await page.click("#btnXImportOk");
+    const s = await sessions(page);
+    const pick = x => ({ ts: x.ts, station: x.station || "", kwh: x.kwh, byn: x.byn, type: x.type, odo: x.odo ?? null, socTo: x.socTo ?? null, kwhBat: x.kwhBat ?? null });
+    expect(s.map(pick)).toEqual(backup.sessions.slice().sort((a, b) => (a.ts < b.ts ? -1 : 1)).map(pick));
+  });
+
+  test("файл из Excel или Google Таблиц: общие строки, цена перед кВт·ч, «Топливо» и дизель «ДТ»", async ({ page }) => {
+    // вымышленный файл: общие строки (заголовок «Пробег» из двух кусков форматирования), связи с префиксом ns1,
+    // даты числами Excel со встроенным форматом, «Цена за кВт·ч» стоит раньше «кВт·ч», строка «ДТ»
+    await page.goto("./");
+    await page.setInputFiles("#fileImport", path.join(__dirname, "fixtures", "excel-shared-strings.xlsx"));
+    const dlg = page.locator("#dlgXImport");
+    await expect(dlg).toBeVisible();
+    await expect(page.locator("#xmap-ts")).toHaveValue("0");
+    await expect(page.locator("#xmap-kwh")).toHaveValue("2");          // не «Цена за кВт·ч»
+    await expect(page.locator("#xmap-byn")).toHaveValue("3");
+    await expect(page.locator("#xmap-type")).toHaveValue("4");         // «Топливо»
+    await expect(page.locator("#xmap-odo")).toHaveValue("5");          // «Про» + «бег»
+    await expect(dlg).toContainText("Будет добавлено: 3 зарядки");
+    await expect(dlg).toContainText("1 строка с топливом пропущена");  // «ДТ»
+    await page.click("#btnXImportOk");
+    const s = await sessions(page);
+    expect(s.map(x => [x.ts, x.kwh, x.byn, x.type, x.odo])).toEqual([
+      ["2026-10-05T07:30", 40, 14.4, "ac", 12000],
+      ["2026-10-06T19:30", 30, 20.7, "dc", 12210],
+      ["2026-10-08T09:00", 25.5, 9.18, "ac", 12550],
+    ]);
+  });
+
+  test("английский CSV: тысячи через запятую, время в UTC, американские даты — предупреждение", async ({ page }) => {
+    const csv = 'Date,Station,kWh,Cost,Odometer\n' +
+      '2026-10-05 10:00,Home,12.5,4.50,"12,345"\n' +
+      '2026-10-06T17:30:00Z,Mall,30.25,"1,020.75","12,500"\n' +   // в Минске это 20:30
+      '10/13/2026 07:00,Home,10,3.60,"12,610"\n';                 // месяц/день — пропускается с предупреждением
+    await page.goto("./");
+    await page.setInputFiles("#fileImport", { name: "en.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    const dlg = page.locator("#dlgXImport");
+    await expect(dlg).toContainText("Будет добавлено: 2 зарядки");
+    await expect(dlg).toContainText("американском формате");
+    await page.click("#btnXImportOk");
+    const s = await sessions(page);
+    expect(s.map(x => [x.ts, x.kwh, x.byn, x.odo])).toEqual([
+      ["2026-10-05T10:00", 12.5, 4.5, 12345],
+      ["2026-10-06T20:30", 30.25, 1020.75, 12500],
+    ]);
+  });
+
+  test("Excel виден в окне выбора файла, а в старом браузере — понятное сообщение", async ({ page }) => {
+    await page.addInitScript(() => { delete window.DecompressionStream; });
+    await page.goto("./");
+    expect(await page.locator("#fileImport").getAttribute("accept")).toContain("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    await page.setInputFiles("#fileImport", MM);                        // внутри сжат — без DecompressionStream не открыть
+    await expect(page.locator("#toast")).toContainText("CSV");
+    await expect(page.locator("#dlgXImport")).toBeHidden();
+  });
+
+  test("импорт можно отменить", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.setInputFiles("#fileImport", MM);
+    await page.click("#btnXImportOk");
+    await expect(page.locator("#undoBanner")).toBeVisible();
+    await expect(page.locator("#undoBanner")).toContainText("Зарядки добавлены");
+    await page.click("#btnUndo");
+    expect(await sessions(page)).toHaveLength(backup.sessions.length);
+  });
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
