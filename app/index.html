@@ -26,21 +26,24 @@ try{ applyTheme(localStorage.getItem("ev-tracker-theme")); }catch(e){}
 @font-face{font-family:"Onest";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/onest-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{
   --plate:#E4E8EC; --panel:#F4F6F8; --ink:#18202B; --muted:#5B6673; --line:#CBD2D9;
-  --drum:#161A20; --drum-ink:#F2F4F6; --red:#C21F2B; --ac:#3F6FA8; --dc:#18202B; --hwy:#C21F2B;
-  --field:#FFFFFF; --fuel:#D9822B; --fuel-btn:#B5651D;
+  --drum:#161A20; --drum-ink:#F2F4F6; --red:#C21F2B; --red-ink:#C21F2B; --ac:#3A68A0; --dc:#18202B; --hwy:#C21F2B;
+  --field:#FFFFFF; --fuel:#D9822B; --fuel-btn:#AD5F1A;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --plate:#12161B; --panel:#1B2027; --ink:#E7EBEF; --muted:#8D98A5; --line:#2C343E;
-    --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
-    --field:#232932; --fuel:#E8A04F; --fuel-btn:#B5651D;
+    --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --red-ink:#F07178; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
+    --field:#232932; --fuel:#E8A04F; --fuel-btn:#AD5F1A;
   }
 }
 :root[data-theme="dark"]{
   --plate:#12161B; --panel:#1B2027; --ink:#E7EBEF; --muted:#8D98A5; --line:#2C343E;
-  --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
-  --field:#232932; --fuel:#E8A04F; --fuel-btn:#B5651D;
+  --drum:#050608; --drum-ink:#EDEFF2; --red:#E3505A; --red-ink:#F07178; --ac:#78A2D8; --dc:#C9D1DA; --hwy:#E3505A;
+  --field:#232932; --fuel:#E8A04F; --fuel-btn:#AD5F1A;
 }
+:root{color-scheme:light dark}
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:inherit}
@@ -80,7 +83,7 @@ section{margin-top:28px}
 
 .odo-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .odo-row b{font-size:20px;font-weight:600}
-.link-btn{background:none;border:0;color:var(--ac);font-weight:500;padding:6px 0}
+.link-btn{background:none;border:0;color:var(--ac);font-weight:500;padding:6px 0;min-height:44px;min-width:44px}
 
 /* Types */
 .types{display:grid;gap:10px}
@@ -95,7 +98,7 @@ section{margin-top:28px}
 .chart{display:flex;flex-direction:column;gap:12px}
 .chart h2{margin:0}
 .pills{display:flex;gap:6px;flex-wrap:wrap}
-.pills button{border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;background:transparent;min-height:40px}
+.pills button{border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;background:transparent;min-height:44px}
 .pills button[aria-pressed="true"]{background:var(--ink);color:var(--plate);border-color:var(--ink);font-weight:600}
 .chart-area{position:relative;height:180px;border-bottom:1px solid var(--line)}
 .chart-ref{position:absolute;left:0;right:0;border-top:1px dashed var(--muted)}
@@ -172,7 +175,7 @@ html.modal-open,html.modal-open body{overflow:hidden;overscroll-behavior:none}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{background:var(--field);border:0;padding:10px 4px;font-size:15px;border-left:1px solid var(--line)}
+.seg button{background:var(--field);border:0;padding:10px 4px;min-height:44px;font-size:15px;border-left:1px solid var(--line)}
 .seg button:first-child{border-left:0}
 .seg.four{grid-template-columns:repeat(4,1fr)}
 .seg.four button{font-size:13px;padding:10px 2px}
@@ -184,10 +187,10 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .sheet-actions{display:flex;gap:10px;margin-top:18px}
 .btn{flex:1;border-radius:10px;padding:13px;font-weight:600;border:1px solid var(--line);background:var(--field)}
 .btn.primary{background:var(--ink);color:var(--plate);border-color:var(--ink)}
-.btn.danger{color:var(--red);flex:0 0 auto;padding:13px 16px}
+.btn.danger{color:var(--red-ink);flex:0 0 auto;padding:13px 16px}
 .btn:disabled{opacity:.5}
 .btn.wipe{background:var(--red);border-color:var(--red);color:#fff}
-.btn.wipe-link{width:100%;margin-top:10px;background:none;color:var(--red)}
+.btn.wipe-link{width:100%;margin-top:10px;background:none;color:var(--red-ink)}
 
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--plate);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
 .toast.on{opacity:1}
@@ -201,7 +204,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:12px 2px;font-size:14px;color:var(--muted)}
 .tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
 [hidden]{display:none!important}
-.more{width:100%;background:none;border:1px dashed var(--line);border-radius:10px;padding:10px;color:var(--muted);font-size:14px;margin-top:4px}
+.more{width:100%;background:none;border:1px dashed var(--line);border-radius:10px;padding:10px;min-height:44px;color:var(--muted);font-size:14px;margin-top:4px}
 .rowline{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;background:none;border:0;padding:8px 0;text-align:left;border-top:1px solid var(--line)}
 .rowline:first-of-type{border-top:0}
 .rowline .l{min-width:0}
@@ -210,7 +213,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .rowline .r{text-align:right;white-space:nowrap}
 .rowline .r b{font-weight:600;display:block}
 .rowline .r small{font-size:12px;color:var(--muted)}
-.rowline.warn .r b{color:var(--red)}
+.rowline.warn .r b{color:var(--red-ink)}
 .cardhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:10px}
 .cardhead .sum{font-size:19px;font-weight:600}
 .month{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
@@ -220,7 +223,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .mgrid b{display:block;font-size:19px;font-weight:600;line-height:1.25}
 .mgrid small{font-size:12px;color:var(--muted);display:block}
 .delta{font-size:12px;font-weight:500;margin-left:4px}
-.delta.good{color:var(--ac)} .delta.bad{color:var(--red)}
+.delta.good{color:var(--ac)} .delta.bad{color:var(--red-ink)}
 .mix{margin-top:14px}
 .mixbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}
 .mixbar i{display:block;height:100%}
@@ -239,7 +242,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .ver a{color:inherit}
 .welcome p a{color:var(--ac)}
 .banner.ios{align-items:flex-start}
-.imp.warn{color:var(--red);font-weight:500}
+.imp.warn{color:var(--red-ink);font-weight:500}
 </style>
 </head>
 <body>
@@ -365,7 +368,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 </main>
 
 <div class="fab"><button id="btnAdd" disabled>Добавить зарядку</button><button id="btnAddFuel" hidden>+ Заправка</button></div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <dialog id="dlgSess"><form class="sheet" id="formSess" method="dialog">
   <h2 id="sessTitle">Новая зарядка</h2>
@@ -581,7 +584,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.19";
+const APP_VERSION = "1.0.20";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -749,7 +752,7 @@ function hybridFigs(st,h,notes,how){
   else if(st.km>0) notes.push("≈ по всем записям с начала учёта. Для точной цены нужны две заправки «полный бак» с пробегом.");
   else notes.push("Укажите пробег — в заправке или кнопкой «Обновить», — чтобы посчитать стоимость километра.");
   how.push("Берём все зарядки и заправки между двумя заправками «полный бак» с пробегом и делим на километры между ними — так кусками купленный бензин не искажает цену.");
-  how.push("«На 100 км пути» — сколько в среднем залито на 100 км, включая километры, проеханные на другом источнике. Это не расход машины.");
+  how.push("«На 100 км пути» — сколько в среднем заправлено и заряжено на 100 км, включая километры, пройденные на другом источнике. Это не расход машины.");
   how.push("Данные машины (запас хода, расход с панели) не используются.");
 }
 
@@ -1159,13 +1162,13 @@ function renderMonths(st){
       const tot=M.byn+M.fuelByn, sh=tot?M.byn/tot*100:null;
       d.innerHTML=`<h3><span>${name[0].toUpperCase()+name.slice(1)}</span><small>${M.partial?"идёт":""}</small></h3>
         <div class="mgrid">
-          <div><b>${fmtInt(M.km)} км</b><small>проехано</small></div>
+          <div><b>${fmtInt(M.km)} км</b><small>пройдено</small></div>
           <div><b>${fmt(tot)} ${cur()}</b><small>на энергию</small></div>
           <div><b>${M.hPer100!=null?"≈"+fmt(M.hPer100,1):"—"}${delta(M.hPer100,P&&P.hPer100,true)}</b><small>${cur()} на 100 км</small></div>
           <div><b>${sh!=null?fmt(sh,0)+"%":"—"}</b><small>денег — на электричество</small></div>
           <div><b>${M.l100!=null?fmt(M.l100,1)+" л":"—"}</b><small>бензина на 100 км пути</small></div>
           <div><b>${M.kwh100!=null?fmt(M.kwh100,1)+" кВт·ч":"—"}</b><small>из сети на 100 км пути</small></div>
-          <div><b>${fmt(M.liters,0)} л · ${fmt(M.kwh,0)} кВт·ч</b><small>залито</small></div>
+          <div><b>${fmt(M.liters,0)} л · ${fmt(M.kwh,0)} кВт·ч</b><small>заправлено · заряжено</small></div>
           <div><b>${fmt(M.costs)} ${cur()}</b><small>прочие расходы</small></div>
         </div>
         ${tot?`<div class="mix"><div class="mixbar"><i class="t-ac" style="width:${sh.toFixed(1)}%"></i><i class="t-fuel" style="width:${(100-sh).toFixed(1)}%"></i></div><div class="mixleg"><span><i class="dot t-ac"></i>электричество ${fmt(M.byn)} ${cur()}${M.price!=null?` · ${fmt(M.price)} за кВт·ч`:""}</span><span><i class="dot t-fuel"></i>бензин ${fmt(M.fuelByn)} ${cur()}</span></div></div>`:""}`;
@@ -1180,7 +1183,7 @@ function renderMonths(st){
     if(M.cons!=null && !M.exact) notes.push("Расход приблизительный: в начале или конце месяца не указан запас хода.");
     d.innerHTML=`<h3><span>${name[0].toUpperCase()+name.slice(1)}</span><small>${M.partial?"идёт":""}</small></h3>
       <div class="mgrid">
-        <div><b>${fmtInt(M.km)} км</b><small>проехано</small></div>
+        <div><b>${fmtInt(M.km)} км</b><small>пройдено</small></div>
         <div><b>${fmt(M.byn)} ${cur()}</b><small>на зарядки</small></div>
         <div><b>${M.cons!=null?(M.exact?"":"≈")+fmt(M.cons,1):"—"}${delta(M.cons,P&&P.cons,true)}</b><small>кВт·ч на 100 км</small></div>
         <div><b>${M.per100!=null?(M.exact?"":"≈")+fmt(M.per100,1):"—"}${delta(M.per100,P&&P.per100,true)}</b><small>${cur()} на 100 км</small></div>
