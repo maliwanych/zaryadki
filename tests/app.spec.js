@@ -1170,6 +1170,82 @@ test("подписи: км — с начала учёта, электричес�
   expect(labels.join(" ")).not.toMatch(/проехано|залито/);
 });
 
+test.describe("тема в настройках", () => {
+  const LIGHT = "rgb(228, 232, 236)", DARK = "rgb(18, 22, 27)";
+  const bg = page => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const meta = page => page.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].map(m => m.content));
+
+  test("светлая при тёмном телефоне: видно сразу, «Отмена» возвращает, «Сохранить» запоминает", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("./");
+    await importBackup(page);
+    await expect.poll(() => bg(page)).toBe(DARK);
+    await page.click("#btnSettings");
+    await expect(page.locator('#themeSeg [data-th=""]')).toHaveAttribute("aria-pressed", "true");   // по умолчанию — как в телефоне
+    await page.click("#themeSeg [data-th=light]");
+    await expect.poll(() => bg(page)).toBe(LIGHT);
+    await page.click("#dlgSet [data-close]");
+    await expect.poll(() => bg(page)).toBe(DARK);
+    await page.click("#btnSettings");
+    await page.click("#themeSeg [data-th=light]");
+    await page.click("#formSet button[type=submit]");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect.poll(() => bg(page)).toBe(LIGHT);
+    expect(await meta(page)).toEqual(["#E4E8EC", "#E4E8EC"]);   // полоса браузера над страницей — тоже светлая
+    await page.goto("./privacy.html");
+    await expect.poll(() => bg(page)).toBe(LIGHT);
+  });
+
+  test("тёмная при светлом телефоне, и обратно «Как в телефоне»", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnSettings");
+    await page.click("#themeSeg [data-th=dark]");
+    await page.click("#formSet button[type=submit]");
+    await page.reload();
+    await expect.poll(() => bg(page)).toBe(DARK);
+    expect(await meta(page)).toEqual(["#12161B", "#12161B"]);
+    await page.click("#btnSettings");
+    await expect(page.locator("#themeSeg [data-th=dark]")).toHaveAttribute("aria-pressed", "true");
+    await page.click('#themeSeg [data-th=""]');
+    await page.click("#formSet button[type=submit]");
+    await page.reload();
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme", /./);
+    await expect.poll(() => bg(page)).toBe(LIGHT);
+    expect(await meta(page)).toEqual(["#E4E8EC", "#12161B"]);
+  });
+});
+
+test("одно изменение — одна перерисовка экрана", async ({ page }) => {
+  // раньше каждая коллекция перерисовывала экран сама — 9 раз подряд на любое сохранение
+  await page.addInitScript(() => {
+    window.__renders = 0;   // «—» в #since — это сама страница, ещё без данных: не считается
+    new MutationObserver(recs => { for (const r of recs) if (r.target.id === "since" && r.addedNodes[0]?.textContent !== "—") window.__renders++; })
+      .observe(document, { subtree: true, childList: true });
+  });
+  await page.goto("./");
+  await expect(page.locator("#since")).not.toHaveText("—");
+  expect(await page.evaluate(() => window.__renders)).toBe(1);
+  await page.click("#btnStart");
+  await page.fill("#formSet [name=carName]", "Другая");
+  await page.fill("#formSet [name=startOdo]", "0");
+  await page.click("#formSet button[type=submit]");
+  await expect(page.locator("#carName")).toHaveText("Другая");
+  expect(await page.evaluate(() => window.__renders)).toBe(2);
+});
+
+test("окна «возвратов» больше нет, а старые возвраты из копии сохраняются", async ({ page }) => {
+  await page.goto("./");
+  await expect(page.locator("#dlgRef")).toHaveCount(0);
+  const withRefund = { ...backup, refunds: [{ id: "r1", byn: 10, date: "2026-08-05", note: "поездка" }] };
+  await page.setInputFiles("#fileImport", { name: "backup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(withRefund)) });
+  await expect(page.locator("#fKwh")).not.toHaveText("0,0");
+  const docs = await page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs);
+  expect(docs["refunds/r1"]).toMatchObject({ byn: 10, note: "поездка" });
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];

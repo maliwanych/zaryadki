@@ -7,6 +7,15 @@
 <meta name="description" content="Учёт зарядок и расходов на электромобиль. Данные хранятся только на вашем телефоне.">
 <meta name="theme-color" content="#E4E8EC" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#12161B" media="(prefers-color-scheme: dark)">
+<script>
+// the theme chosen in settings (none — as on the phone): applied before the first paint, so the page doesn't flash
+function applyTheme(t){
+  if(t!=="light"&&t!=="dark") t=null;
+  var r=document.documentElement; if(t) r.setAttribute("data-theme",t); else r.removeAttribute("data-theme");
+  document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){ var dark=t?t==="dark":/dark/.test(m.media); m.content=dark?"#12161B":"#E4E8EC"; });
+}
+try{ applyTheme(localStorage.getItem("ev-tracker-theme")); }catch(e){}
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -438,6 +447,9 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <p class="hint full phev-only" hidden>Начало учёта — день, с которого вы записываете все зарядки и заправки. Для гибрида запас хода и ёмкость не нужны: считаем только по тому, что вы зарядили и заправили и сколько заплатили.</p>
     <p class="hint full ev-only">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
     <p class="hint full ev-only">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
+    <div class="full"><label style="margin-bottom:4px">Тема</label>
+      <div class="seg" id="themeSeg"><button type="button" data-th="">Как в телефоне</button><button type="button" data-th="light">Светлая</button><button type="button" data-th="dark">Тёмная</button></div>
+    </div>
   </div>
   <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
   <button type="button" class="btn wipe-link" id="btnWipe" hidden>Удалить все данные</button>
@@ -447,20 +459,6 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   </div>
 </form></dialog>
 
-<dialog id="dlgRef"><form class="sheet" id="formRef" method="dialog">
-  <h2 id="refTitle">Возврат за поездку</h2>
-  <div class="fgrid">
-    <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required></label>
-    <label>Дата<input type="date" name="date"></label>
-    <label class="full">За что<input name="note" placeholder="Например, поездка в Брест"></label>
-    <p class="hint full">Деньги, которые вам докинули на дорогу. Уменьшают личные траты, но не меняют стоимость километра для машины.</p>
-  </div>
-  <div class="sheet-actions">
-    <button type="button" class="btn danger" id="btnRefDel" hidden>Удалить</button>
-    <button type="button" class="btn" data-close>Отмена</button>
-    <button type="submit" class="btn primary">Сохранить</button>
-  </div>
-</form></dialog>
 
 <dialog id="dlgCost"><form class="sheet" id="formCost" method="dialog">
   <h2 id="costTitle">Расход на машину</h2>
@@ -563,7 +561,7 @@ function localDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padSt
 function addMonths(d,n){ const x=new Date(d.getFullYear(), d.getMonth()+n, 1); x.setDate(Math.min(d.getDate(), new Date(x.getFullYear(), x.getMonth()+1, 0).getDate())); return x; }
 const TYPES = {ac:{name:"AC, медленная",cls:"t-ac",var:"--ac"}, dc:{name:"DC в городе",cls:"t-dc",var:"--dc"}, hwy:{name:"DC на трассе",cls:"t-hwy",var:"--hwy"}};
 const S = {sessions:[], settings:{purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], fuel:[], loaded:{s:false,set:false,cur:false}};
-let lastTotal = 0, db = null, downloads = null, editingId = null, editingRef = null, editingCost = null, editingRem = null, bynTouched = false, curType = "dc", firstPaint = true;
+let lastTotal = 0, db = null, downloads = null, editingId = null, editingCost = null, editingRem = null, bynTouched = false, curType = "dc", firstPaint = true;
 
 const $ = id => document.getElementById(id);
 const num = v => { if (v===null||v===undefined) return null; const s=String(v).replace(/\s/g,"").replace(",","."); if(s==="") return null; const n=parseFloat(s); return isFinite(n)?n:null; };
@@ -583,7 +581,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.17";
+const APP_VERSION = "1.0.18";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -596,7 +594,7 @@ function LocalDB(key){
   let docs=load();
   const subs=new Set();
   const save=()=>localStorage.setItem(key, JSON.stringify({schema:1, docs}));   // throws on quota → caller shows a toast
-  const notify=()=>subs.forEach(f=>f());
+  const notify=()=>subs.forEach(f=>f());   // in the order of subscription
   const snap=p=>{ const d=docs[p]; return {id:p.split("/").pop(), exists:d!==undefined, data:()=>d}; };
   const depth=p=>p.split("/").length;
   const colDocs=c=>Object.keys(docs).filter(k=>k.startsWith(c+"/")&&depth(k)===depth(c)+1).sort().map(snap);
@@ -610,7 +608,9 @@ function LocalDB(key){
   const collection=c=>({ path:c, doc:id=>doc(`${c}/${id||LocalDB.newId()}`), onSnapshot:(n)=>sub(()=>{ const d=colDocs(c); n({docs:d,size:d.length,empty:!d.length}); }) });
   // another tab or window changed the data
   window.addEventListener("storage",e=>{ if(e.key===key){ docs=load(); notify(); } });
-  return { doc, collection, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); },
+  // after every change, once — subscribed last, it runs after all onSnapshot handlers have read the new data
+  const onChange=f=>sub(f);
+  return { doc, collection, onChange, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); },
     setMany:(pairs)=>{ const prev={...docs}; pairs.forEach(([p,d])=>{ docs[p]=JSON.parse(JSON.stringify(d)); }); try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
 }
 LocalDB.newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -1290,35 +1290,27 @@ function setPt(p){
   document.querySelectorAll("#formSet .phev-only").forEach(el=>{ el.hidden=p!=="phev"; });
 }
 $("ptSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-p]"); if(b) setPt(b.dataset.p); });
-function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency); setPt(S.settings.powertrain==="phev"?"phev":"ev");
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency); setPt(S.settings.powertrain==="phev"?"phev":"ev"); setThemeSeg(savedTheme());
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
   if(u) b.dataset.label=`Вернуть данные, как было до ${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}, ${new Date(u.at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}`;
   disarm(b);
   $("btnWipe").hidden = DEMO || !(S.configured || Object.values(phoneCounts()).some(Boolean));
   $("dlgSet").showModal(); }
+// the theme: shown at once on a tap, kept on «Сохранить», «Отмена» brings back the saved one; per phone, not in backups
+const THEME_KEY="ev-tracker-theme";
+let curTheme=null;
+function savedTheme(){ try{ const t=localStorage.getItem(THEME_KEY); return t==="light"||t==="dark"?t:null; }catch(e){ return null; } }
+function setThemeSeg(t){ curTheme=t; $("themeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",(b.dataset.th||null)===t)); applyTheme(t); }
+$("themeSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-th]"); if(b) setThemeSeg(b.dataset.th||null); });
+$("dlgSet").addEventListener("close",()=>applyTheme(savedTheme()));
 $("btnSettings").addEventListener("click",openSettings);
 $("btnStart").addEventListener("click",openSettings);
 $("formSet").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target;
+  try{ if(curTheme) localStorage.setItem(THEME_KEY,curTheme); else localStorage.removeItem(THEME_KEY); }catch(err){}
   try{ await db.doc("meta/settings").set({...S.settings, carName:f.carName.value.trim(), purchaseDate:f.purchaseDate.value, startOdo:num(f.startOdo.value)||0, startRange:num(f.startRange.value), currency:f.currency.value, powertrain:curPt, carCons:num(f.carCons.value), capKwh:num(f.capKwh.value)}); $("dlgSet").close(); toast("Настройки сохранены"); }
   catch(err){ toast("Не сохранилось. Повторите"); }
 });
-
-function openRef(r){
-  const f=$("formRef"); f.reset(); editingRef=r?r.id:null; $("btnRefDel").hidden=!r; disarm($("btnRefDel"));
-  $("refTitle").textContent = r?"Возврат":"Возврат за поездку";
-  f.byn.value = r? String(r.byn).replace(".",","):""; f.date.value=r?.date||nowLocal().slice(0,10); f.note.value=r?.note||"";
-  $("dlgRef").showModal();
-}
-
-$("formRef").addEventListener("submit",async e=>{
-  e.preventDefault(); if(!db) return; const f=e.target; const byn=num(f.byn.value);
-  if(byn===null||byn<=0){ toast("Укажите сумму"); return; }
-  try{ const ref = editingRef? db.collection("refunds").doc(editingRef) : db.collection("refunds").doc();
-    await ref.set({...kept(S.refunds,editingRef), byn, date:f.date.value||null, note:f.note.value.trim()}); $("dlgRef").close(); toast("Возврат сохранён"); }
-  catch(err){ toast("Не сохранилось. Повторите"); }
-});
-armConfirm($("btnRefDel"), async()=>{ if(!editingRef||!db) return; await db.collection("refunds").doc(editingRef).delete(); $("dlgRef").close(); toast("Возврат удалён"); });
 
 let costKind="run";
 function setCostKind(k){ costKind=k;
@@ -1922,15 +1914,16 @@ setTab("overview");
   $("btnAdd").disabled=false; $("btnXlsx").hidden=false; $("btnJson").hidden=false;
   $("appVer").textContent = APP_VERSION;
   const onErr = ()=>{};
-  db.collection("sessions").onSnapshot(snap=>{ S.sessions=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.doc("meta/settings").onSnapshot(snap=>{ S.configured=snap.exists; S.settings={purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:"", ...(snap.exists?snap.data():{})}; render(); }, onErr);
-  db.doc("meta/backup").onSnapshot(snap=>{ S.backup=snap.exists?snap.data():null; render(); }, onErr);
-  db.collection("costs").onSnapshot(snap=>{ S.costs=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.collection("reminders").onSnapshot(snap=>{ S.reminders=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.collection("fuel").onSnapshot(snap=>{ S.fuel=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.collection("odo").onSnapshot(snap=>{ S.odoLog=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.collection("refunds").onSnapshot(snap=>{ S.refunds=snap.docs.map(d=>({id:d.id,...d.data()})); render(); }, onErr);
-  db.doc("meta/current").onSnapshot(snap=>{ S.current=snap.exists?snap.data():null; render(); }, onErr);
+  db.collection("sessions").onSnapshot(snap=>{ S.sessions=snap.docs.map(d=>({id:d.id,...d.data()})); }, onErr);
+  db.doc("meta/settings").onSnapshot(snap=>{ S.configured=snap.exists; S.settings={purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:"", ...(snap.exists?snap.data():{})}; }, onErr);
+  db.doc("meta/backup").onSnapshot(snap=>{ S.backup=snap.exists?snap.data():null; }, onErr);
+  db.collection("costs").onSnapshot(snap=>{ S.costs=snap.docs.map(d=>({id:d.id,...d.data()})); }, onErr);
+  db.collection("reminders").onSnapshot(snap=>{ S.reminders=snap.docs.map(d=>({id:d.id,...d.data()})); }, onErr);
+  db.collection("fuel").onSnapshot(snap=>{ S.fuel=snap.docs.map(d=>({id:d.id,...d.data()})); }, onErr);
+  db.collection("odo").onSnapshot(snap=>{ S.odoLog=snap.docs.map(d=>({id:d.id,...d.data()})); }, onErr);
+  db.collection("refunds").onSnapshot(snap=>{ S.refunds=snap.docs.map(d=>({id:d.id,...d.data()})); }, onErr);
+  db.doc("meta/current").onSnapshot(snap=>{ S.current=snap.exists?snap.data():null; }, onErr);
+  db.onChange(render);   // one render per change (was one per collection — 9 in a row)
   // ask the browser not to evict our data under storage pressure
   if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   registerSW();
