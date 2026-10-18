@@ -1246,6 +1246,87 @@ test("окна «возвратов» больше нет, а старые во�
   expect(docs["refunds/r1"]).toMatchObject({ byn: 10, note: "поездка" });
 });
 
+test.describe("дизайн-ревью: подписи, тёмная тема, размеры кнопок, контраст", () => {
+  // замеры как в ревью: кнопки под палец ≥ 44 px (кроме ссылок внутри текста), контраст текста ≥ 4,5:1 (крупный ≥ 3:1)
+  const check = page => page.evaluate(() => {
+    const vis = el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && !el.closest("[hidden]") && !el.closest("dialog:not([open])"); };
+    const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+    const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const bgOf = el => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length && (c.length < 4 || c[3] > 0.9)) return c; } return rgb(getComputedStyle(document.body).backgroundColor); };
+    const scope = document.querySelector("dialog[open]") || document;
+    const small = [], low = [];
+    scope.querySelectorAll("button, a[href], input:not([type=hidden]), select").forEach(el => {
+      if (!vis(el) || el.closest("p")) return;
+      const r = el.getBoundingClientRect();
+      if (r.height < 44 || r.width < 44) small.push(`${(el.textContent || el.name).trim().slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+    });
+    scope.querySelectorAll("*").forEach(el => {
+      if (!vis(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
+      const s = getComputedStyle(el), fs = parseFloat(s.fontSize), fg = rgb(s.color), bg = bgOf(el);
+      const a = fg.length > 3 ? fg[3] : 1, mix = [0, 1, 2].map(i => fg[i] * a + bg[i] * (1 - a));
+      const L1 = lum(mix), L2 = lum(bg), ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+      const large = fs >= 24 || (fs >= 18.66 && Number(s.fontWeight) >= 700);
+      if (ratio < (large ? 3 : 4.5)) low.push(`${ratio.toFixed(2)} «${el.textContent.trim().slice(0, 30)}»`);
+    });
+    return { small: [...new Set(small)], low: [...new Set(low)] };
+  });
+
+  test("карточки месяцев: «пройдено» и «заряжено», как на «Обзоре»", async ({ page }) => {
+    // отзыв из чата (1.0.17): км — «пройдено», электричество — «заряжено», не «залито»
+    await page.goto("./");
+    await page.click("#btnDemo");
+    await expect(page.locator("#months .month").first()).toBeVisible();
+    await expect(page.locator("#months")).toContainText("пройдено");
+    await expect(page.locator("#months")).not.toContainText(/проехано|залито/);
+    await page.click("#btnSettings");
+    await page.click("#ptSeg [data-p=phev]");
+    await page.click("#formSet button[type=submit]");
+    await expect(page.locator("#months")).toContainText("заправлено · заряжено");
+    await expect(page.locator("#months")).not.toContainText(/проехано|залито/);
+    await page.click("#perNote button");
+    await expect(page.locator("#perNote")).not.toContainText(/проехан|залито/);
+  });
+
+  test("браузер знает тему: поля даты и списки в тёмной теме тоже тёмные", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("./");
+    const scheme = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+    expect(await scheme()).toBe("light dark");              // как в телефоне
+    await page.evaluate(() => applyTheme("light"));
+    expect(await scheme()).toBe("light");
+    await page.evaluate(() => applyTheme("dark"));
+    expect(await scheme()).toBe("dark");
+  });
+
+  for (const colorScheme of ["light", "dark"]) {
+    test(`кнопки не меньше 44 px и контраст текста по норме (${colorScheme === "light" ? "светлая" : "тёмная"} тема)`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.goto("./");
+      await page.click("#btnDemo");
+      await expect(page.locator("#months .month").first()).toBeVisible();
+      await page.waitForTimeout(1300);                       // барабаны докрутились
+      expect(await check(page)).toEqual({ small: [], low: [] });
+      await page.click("#tabs [data-tab=costs]");
+      await page.locator("#costList .rowline").first().click();   // окно расхода с кнопкой «Удалить»
+      await expect(page.locator("#btnCostDel")).toBeVisible();
+      expect(await check(page)).toEqual({ small: [], low: [] });
+      await page.keyboard.press("Escape");
+      await page.click("#tabs [data-tab=overview]");
+      await page.click("#btnSettings");
+      await page.click("#ptSeg [data-p=phev]");
+      await page.click("#formSet button[type=submit]");
+      await expect(page.locator("#btnAddFuel")).toBeVisible();
+      expect(await check(page)).toEqual({ small: [], low: [] });
+    });
+  }
+
+  test("сообщения вроде «Зарядка сохранена» озвучиваются экранным диктором", async ({ page }) => {
+    await page.goto("./");
+    await expect(page.locator("#toast")).toHaveAttribute("role", "status");
+    await expect(page.locator("#toast")).toHaveAttribute("aria-live", "polite");
+  });
+});
+
 test("значки: размеры как в manifest, у значков для iPhone и Android-маски нет прозрачных углов, все — в офлайн-кэше", async ({ page }) => {
   // iPhone закрашивает прозрачные углы чёрным, Android сам вырезает форму из маскируемого значка
   await page.goto("./");
