@@ -1160,6 +1160,16 @@ test.describe("удаление всех данных", () => {
   });
 });
 
+test("подписи: км — с начала учёта, электричество — заряжено", async ({ page }) => {
+  // отзыв из чата: «км проехано» путали с пробегом машины, «кВт·ч залито» звучит как про бензин
+  await page.goto("./");
+  await importBackup(page);
+  const labels = await page.locator(".figs .fig small").allTextContents();
+  expect(labels).toContain("км пройдено");
+  expect(labels).toContain("кВт·ч заряжено");
+  expect(labels.join(" ")).not.toMatch(/проехано|залито/);
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];
