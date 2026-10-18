@@ -9,6 +9,12 @@ const FIXTURE = path.join(__dirname, "fixtures", "sample-backup.json");
 const backup = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
 const num = s => parseFloat(String(s).replace(/[^\d,.-]/g, "").replace(",", "."));
 
+// резервная копия, Excel и загрузка файла — в настройках, блок «Данные»
+async function dataBtn(page, id) {
+  if (!(await page.locator("#dlgSet").evaluate(d => d.open))) await page.click("#btnSettings");
+  await page.click(id);
+}
+
 async function importBackup(page) {
   await page.setInputFiles("#fileImport", FIXTURE);
   await expect(page.locator("#fKwh")).not.toHaveText("0,0");
@@ -67,7 +73,7 @@ test("сумма подставляется по цене станции, бес
 test("резервная копия сохраняется и содержит все данные", async ({ page }) => {
   await page.goto("./");
   await importBackup(page);
-  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#btnJson")]);
+  const [download] = await Promise.all([page.waitForEvent("download"), dataBtn(page, "#btnJson")]);
   const saved = JSON.parse(fs.readFileSync(await download.path(), "utf8"));
   expect(saved.sessions).toHaveLength(backup.sessions.length);
   expect(saved.costs).toHaveLength(backup.costs.length);
@@ -451,7 +457,7 @@ test("валюта ₽: все подписи меняются, суммы те 
   await page.click("#dlgSess [data-close]");
   await page.reload();
   await expect(page.locator(".reg-unit")).toHaveText("₽");
-  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#btnJson")]);
+  const [download] = await Promise.all([page.waitForEvent("download"), dataBtn(page, "#btnJson")]);
   expect(JSON.parse(fs.readFileSync(await download.path(), "utf8")).settings.currency).toBe("RUB");
 });
 
@@ -524,9 +530,9 @@ test.describe("пример с данными", () => {
     const mine = await stored(page, "ev-tracker");
     await page.click("#btnDemo");
     await expect(page.locator("#demoBanner")).toBeVisible();
-    await page.click("#btnJson");
+    await dataBtn(page, "#btnJson");
     await expect(page.locator("#toast")).toContainText("выйдите из примера");
-    await page.click("#btnImport");
+    await dataBtn(page, "#btnImport");
     await expect(page.locator("#toast")).toContainText("выйдите из примера");
     await expect(page.locator("#bakBanner")).toBeHidden();
     await page.click("#btnDemoExit");
@@ -773,7 +779,7 @@ test("выгрузка в Excel: настоящий .xlsx, листы, числ�
   await importBackup(page);
   await expect(page.locator("#btnXlsx")).toHaveText("Выгрузить в Excel");
   await expect(page.locator("#btnCsv")).toHaveCount(0);
-  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#btnXlsx")]);
+  const [download] = await Promise.all([page.waitForEvent("download"), dataBtn(page, "#btnXlsx")]);
   expect(download.suggestedFilename()).toMatch(/^zaryadki-\d{4}-\d{2}-\d{2}\.xlsx$/);
   const files = readStoredZip(fs.readFileSync(await download.path()));
   for (const name of ["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/styles.xml", "xl/worksheets/sheet1.xml"])
@@ -862,7 +868,7 @@ test.describe("импорт из Excel и CSV", () => {
   test("свой файл Excel загружается обратно сам, один в один", async ({ page }) => {
     await page.goto("./");
     await importBackup(page);
-    const [d] = await Promise.all([page.waitForEvent("download"), page.click("#btnXlsx")]);
+    const [d] = await Promise.all([page.waitForEvent("download"), dataBtn(page, "#btnXlsx")]);
     const buffer = fs.readFileSync(await d.path());
     await page.evaluate(() => localStorage.clear());
     await page.reload();
@@ -1095,12 +1101,12 @@ test.describe("режим гибрида с розеткой", () => {
   test("копия и Excel: заправки и тип машины сохраняются", async ({ page }) => {
     await page.goto("./");
     await importJson(page, HYB);
-    const [json] = await Promise.all([page.waitForEvent("download"), page.click("#btnJson")]);
+    const [json] = await Promise.all([page.waitForEvent("download"), dataBtn(page, "#btnJson")]);
     const saved = JSON.parse(fs.readFileSync(await json.path(), "utf8"));
     expect(saved.settings.powertrain).toBe("phev");
     expect(saved.fuel).toHaveLength(3);
     expect(saved.fuel.find(x => x.id === "f3")).toMatchObject({ liters: 30, byn: 78, odo: 11000, full: true });
-    const [x] = await Promise.all([page.waitForEvent("download"), page.click("#btnXlsx")]);
+    const [x] = await Promise.all([page.waitForEvent("download"), dataBtn(page, "#btnXlsx")]);
     const files = readStoredZip(fs.readFileSync(await x.path()));
     expect([...files["xl/workbook.xml"].matchAll(/<sheet name="([^"]+)"/g)].map(m => m[1])).toEqual(["Зарядки", "Заправки", "Расходы", "Пробег"]);
     expect((files["xl/worksheets/sheet2.xml"].match(/<row /g) || []).length).toBe(4);
@@ -1244,6 +1250,32 @@ test("окна «возвратов» больше нет, а старые во�
   await expect(page.locator("#fKwh")).not.toHaveText("0,0");
   const docs = await page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs);
   expect(docs["refunds/r1"]).toMatchObject({ byn: 10, note: "поездка" });
+});
+
+test("«Настройки» — в шапке на любой вкладке, файлы — в настройках («Данные»), одна кнопка загрузки", async ({ page }) => {
+  // ревью: настройки и пять ссылок для файлов были только внизу «Обзора», «Загрузить копию» и «Импорт» делали одно и то же
+  await page.goto("./");
+  await importBackup(page);
+  for (const t of ["overview", "sessions", "costs", "rem"]) {
+    await page.click(`#tabs [data-tab=${t}]`);
+    await expect(page.locator("#btnSettings")).toBeInViewport();
+  }
+  await expect(page.locator(".actions-bottom")).toHaveCount(0);
+  await expect(page.locator("#btnXImport")).toHaveCount(0);
+  await page.click("#btnSettings");
+  for (const id of ["#btnJson", "#btnXlsx", "#btnImport"]) await expect(page.locator(`#dlgSet ${id}`)).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await page.click("#btnImport");
+  await chooser;
+  await expect(page.locator("#dlgSet")).toBeHidden();      // окно настроек закрылось, дальше — как раньше
+});
+
+test("вкладка «Зарядки»: сначала список зарядок, статистика — под ним", async ({ page }) => {
+  await page.goto("./");
+  await importBackup(page);
+  await page.click("#tabs [data-tab=sessions]");
+  const y = async sel => (await page.locator(sel).boundingBox()).y;
+  expect(await y("#list")).toBeLessThan(await y("#typesSec"));
 });
 
 test.describe("дизайн-ревью: подписи, тёмная тема, размеры кнопок, контраст", () => {

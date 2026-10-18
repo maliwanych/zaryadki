@@ -159,7 +159,11 @@ label.check small{font-size:12px;color:var(--muted)}
 .sess .meta.r{text-align:right}
 .sess.glitch{opacity:.6}
 
-.actions-bottom{display:flex;gap:16px;justify-content:center;margin-top:24px;flex-wrap:wrap}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px}
+.top h1{margin:0}
+.top .link-btn{flex:none}
+.set-h{font-size:15px;font-weight:600;margin:22px 0 4px}
+.set-data{display:grid;gap:8px;margin:10px 0 8px}
 
 .fab{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--plate) 70%,transparent);display:flex;justify-content:center;z-index:5}
 .fab button{width:100%;max-width:528px;background:var(--ink);color:var(--plate);border:0;border-radius:12px;padding:15px;font-weight:600;font-size:17px}
@@ -237,7 +241,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .welcome p{margin:0 0 12px;color:var(--muted);font-size:14px}
 .welcome .row{display:flex;gap:10px;flex-wrap:wrap}
 .welcome .btn{flex:1 1 140px}
-.ver{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+.ver{font-size:12px;color:var(--muted);text-align:center;margin-top:28px}
 .imp{margin:0 0 10px;font-size:15px}
 .ver a{color:inherit}
 .welcome p a{color:var(--ac)}
@@ -252,7 +256,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <div class="banner" id="undoBanner" hidden><span id="undoText">Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
   <div class="banner ios" id="iosHint" hidden><span id="iosText"></span><button class="link-btn" id="btnIosHint">Понятно</button></div>
   <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
-  <h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1>
+  <div class="top"><h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1><button class="link-btn" id="btnSettings">Настройки</button></div>
   <div class="welcome" id="welcome" hidden>
     <h2>Учёт зарядок</h2>
     <p>Записывайте зарядки, пробег и расходы на машину — трекер посчитает стоимость километра, расход и экономию. Все данные хранятся только на этом телефоне, никуда не отправляются. <a href="privacy.html">Подробнее</a></p>
@@ -318,6 +322,12 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <button class="more" id="btnAllMonths" hidden></button>
   </section>
 
+  <section data-tab="sessions">
+    <h2 id="listTitle">Все зарядки</h2>
+    <div class="pills" id="listPills" role="group" aria-label="Что показывать" hidden style="margin-bottom:10px"></div>
+    <div id="list"><p class="muted">Загружаю данные…</p></div>
+  </section>
+
   <section id="azsSec" data-tab="sessions" data-empty="1" hidden>
     <h2>АЗС</h2>
     <div class="card" id="azsStats"></div>
@@ -350,19 +360,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     </div>
   </section>
 
-  <section data-tab="sessions">
-    <h2 id="listTitle">Все зарядки</h2>
-    <div class="pills" id="listPills" role="group" aria-label="Что показывать" hidden style="margin-bottom:10px"></div>
-    <div id="list"><p class="muted">Загружаю данные…</p></div>
-  </section>
 
-  <div class="actions-bottom tabbed" data-tab="overview">
-    <button class="link-btn" id="btnXlsx" hidden>Выгрузить в Excel</button>
-    <button class="link-btn" id="btnJson" hidden>Резервная копия</button>
-    <button class="link-btn" id="btnImport">Загрузить копию</button>
-    <button class="link-btn" id="btnXImport">Импорт из Excel</button>
-    <button class="link-btn" id="btnSettings">Настройки</button>
-  </div>
   <p class="ver tabbed" data-tab="overview">Версия <span id="appVer"></span> · данные хранятся только на этом устройстве · <a href="privacy.html">Конфиденциальность</a></p>
   <input type="file" id="fileImport" accept="application/json,.json,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv,text/csv,text/plain" hidden>
 </main>
@@ -454,6 +452,14 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
       <div class="seg" id="themeSeg"><button type="button" data-th="">Как в телефоне</button><button type="button" data-th="light">Светлая</button><button type="button" data-th="dark">Тёмная</button></div>
     </div>
   </div>
+  <h3 class="set-h">Данные</h3>
+  <p class="hint">Всё хранится только на этом телефоне. С резервной копией данные можно вернуть или перенести на другой телефон.</p>
+  <div class="set-data">
+    <button type="button" class="btn" id="btnJson" hidden>Сохранить резервную копию</button>
+    <button type="button" class="btn" id="btnXlsx" hidden>Выгрузить в Excel</button>
+    <button type="button" class="btn" id="btnImport">Загрузить файл</button>
+  </div>
+  <p class="hint">Резервная копия (.json) заменит данные, таблица Excel или CSV — добавит зарядки к ним.</p>
   <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
   <button type="button" class="btn wipe-link" id="btnWipe" hidden>Удалить все данные</button>
   <div class="sheet-actions">
@@ -584,7 +590,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.20";
+const APP_VERSION = "1.0.21";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1542,7 +1548,8 @@ const NOT_IN_DEMO="В примере это недоступно — выйди�
 const openImport=()=>{ if(DEMO){ toast(NOT_IN_DEMO); return; } $("fileImport").click(); };
 $("btnImport").addEventListener("click",openImport);
 $("btnImport1").addEventListener("click",openImport);
-$("btnXImport").addEventListener("click",openImport);
+// backup, Excel and loading a file live in settings («Данные»): the sheet closes, then everything goes as before
+["btnJson","btnXlsx","btnImport"].forEach(id=>$(id).addEventListener("click",()=>$("dlgSet").close()));
 $("fileImport").addEventListener("change",async e=>{
   const file=e.target.files[0]; e.target.value=""; if(!file) return;
   let data, buf;
@@ -1643,7 +1650,7 @@ function iosHint(){
   if(el.hidden) return;
   const has=!DEMO && (S.sessions.length||S.costs.length||S.reminders.length||S.odoLog.length);
   $("iosText").textContent="Установите приложение: кнопка «Поделиться» → На экран «Домой», и открывайте его с иконки. У Safari и у иконки разные хранилища: записи, внесённые здесь, в приложении с иконки не появятся."
-    +(has?" Здесь уже есть записи — сохраните резервную копию и загрузите её в приложении с иконки.":"");
+    +(has?" Здесь уже есть записи — сохраните резервную копию («Настройки» → «Данные») и загрузите её в приложении с иконки.":"");
 }
 $("btnIosHint").addEventListener("click",()=>{ try{ localStorage.setItem(IOS_HINT_KEY,"1"); }catch(e){} $("iosHint").hidden=true; });
 
