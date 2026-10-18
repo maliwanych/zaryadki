@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Значок «Зарядки»: барабаны счётчика, последний — красный с молнией.
+       Только рисунок, без плитки: фон и форму добавляет make-icons.js. Цифры — шрифт Onest (app/fonts). -->
+  <rect x="70" y="156" width="372" height="200" rx="36" fill="#161A20"/>
+  <defs>
+    <clipPath id="drums">
+      <rect x="88" y="170" width="100" height="172" rx="14"/>
+      <rect x="206" y="170" width="100" height="172" rx="14"/>
+      <rect x="324" y="170" width="100" height="172" rx="14"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#drums)">
+    <rect x="70" y="170" width="372" height="172" fill="#2B323C"/>
+    <rect x="324" y="170" width="100" height="172" fill="#C21F2B"/>
+    <!-- над и под цифрой видны края соседних — барабан крутится -->
+    <g font-family="Onest, sans-serif" font-weight="700" font-size="120" text-anchor="middle" fill="#F2F4F6">
+      <text x="138" y="186">0</text><text x="138" y="298">1</text><text x="138" y="410">2</text>
+      <text x="256" y="186">3</text><text x="256" y="298">4</text><text x="256" y="410">5</text>
+    </g>
+    <path transform="translate(324 206)" d="M58 4 L18 58 H46 L38 96 L82 40 H54 Z" fill="#F2F4F6"/>
+    <!-- тень сверху и снизу — объём барабана -->
+    <rect x="70" y="170" width="372" height="40" fill="#000" fill-opacity=".32"/>
+    <rect x="70" y="302" width="372" height="40" fill="#000" fill-opacity=".32"/>
+  </g>
+</svg>

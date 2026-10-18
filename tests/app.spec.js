@@ -1246,6 +1246,25 @@ test("окна «возвратов» больше нет, а старые во�
   expect(docs["refunds/r1"]).toMatchObject({ byn: 10, note: "поездка" });
 });
 
+test("значки: размеры как в manifest, у значков для iPhone и Android-маски нет прозрачных углов, все — в офлайн-кэше", async ({ page }) => {
+  // iPhone закрашивает прозрачные углы чёрным, Android сам вырезает форму из маскируемого значка
+  await page.goto("./");
+  const icons = await page.evaluate(async () => {
+    const m = await (await fetch("manifest.webmanifest")).json();
+    const load = src => new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error(src)); i.src = src; });
+    const cornerAlpha = i => { const c = document.createElement("canvas"); c.width = i.naturalWidth; c.height = i.naturalHeight; const x = c.getContext("2d"); x.drawImage(i, 0, 0); return x.getImageData(0, 0, 1, 1).data[3]; };
+    const list = [...m.icons.map(ic => ({ src: ic.src, sizes: ic.sizes, kind: ic.purpose || "any" })),
+      { src: document.querySelector('link[rel="apple-touch-icon"]').getAttribute("href"), sizes: "180x180", kind: "apple" }];
+    for (const ic of list) { const i = await load(ic.src); ic.real = `${i.naturalWidth}x${i.naturalHeight}`; ic.alpha = cornerAlpha(i); }
+    return list;
+  });
+  for (const ic of icons) expect(ic.real, ic.src).toBe(ic.sizes);
+  expect(icons.find(ic => ic.kind === "maskable").alpha).toBe(255);
+  expect(icons.find(ic => ic.kind === "apple").alpha).toBe(255);
+  const sw = fs.readFileSync(path.join(__dirname, "..", "app", "sw.js"), "utf8");
+  for (const f of fs.readdirSync(path.join(__dirname, "..", "app", "icons"))) expect(sw, f).toContain(`"icons/${f}"`);
+});
+
 test("версия совпадает в index.html, sw.js и package.json", () => {
   const app = path.join(__dirname, "..", "app");
   const a = fs.readFileSync(path.join(app, "index.html"), "utf8").match(/APP_VERSION = "([^"]+)"/)[1];

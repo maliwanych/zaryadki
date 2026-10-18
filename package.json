@@ -1,12 +1,13 @@
 {
   "name": "zaryadki",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "private": true,
   "description": "Учёт зарядок и расходов на электромобиль — офлайн-приложение для телефона (PWA)",
   "scripts": {
     "start": "http-server app -p 8765 -c-1",
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "icons": "node design/make-icons.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.0",
