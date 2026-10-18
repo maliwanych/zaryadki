@@ -7,6 +7,15 @@
 <meta name="description" content="Как приложение «Учёт зарядок» обращается с вашими данными: они хранятся только на вашем устройстве.">
 <meta name="theme-color" content="#E4E8EC" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#12161B" media="(prefers-color-scheme: dark)">
+<script>
+// the theme chosen in settings (none — as on the phone): applied before the first paint, so the page doesn't flash
+function applyTheme(t){
+  if(t!=="light"&&t!=="dark") t=null;
+  var r=document.documentElement; if(t) r.setAttribute("data-theme",t); else r.removeAttribute("data-theme");
+  document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){ var dark=t?t==="dark":/dark/.test(m.media); m.content=dark?"#12161B":"#E4E8EC"; });
+}
+try{ applyTheme(localStorage.getItem("ev-tracker-theme")); }catch(e){}
+</script>
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <style>
 :root{--plate:#E4E8EC; --panel:#F4F6F8; --ink:#18202B; --muted:#5B6673; --line:#CBD2D9; --ac:#3F6FA8}
