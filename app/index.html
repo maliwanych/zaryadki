@@ -271,8 +271,8 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <div class="fig"><b id="fPer100">—</b><small><span class="cur">BYN</span> на 100 км</small></div>
     <div class="fig"><b id="fCons">—</b><small>кВт·ч на 100 км</small></div>
     <div class="fig"><b id="fPrice">—</b><small><span class="cur">BYN</span> за кВт·ч в среднем</small></div>
-    <div class="fig"><b id="fKm">—</b><small>км проехано</small></div>
-    <div class="fig"><b id="fKwh">—</b><small>кВт·ч залито</small></div>
+    <div class="fig"><b id="fKm">—</b><small>км пройдено</small></div>
+    <div class="fig"><b id="fKwh">—</b><small>кВт·ч заряжено</small></div>
     <div class="fig"><b id="fSaved">—</b><small id="fSavedL">сэкономлено на бесплатных зарядках</small></div>
   </div>
   <div class="note" id="perNote"></div></div>
@@ -583,7 +583,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.16";
+const APP_VERSION = "1.0.17";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -732,8 +732,8 @@ function hybridStats(st){
     per100:base?base.byn/base.km*100:null, l100:base?base.liters/base.km*100:null, kwh100:base?base.kwh/base.km*100:null};
 }
 const FIG_LABELS={
-  ev:[()=>`${cur()} на 100 км`,()=>"кВт·ч на 100 км",()=>`${cur()} за кВт·ч в среднем`,()=>"км проехано",()=>"кВт·ч залито"],
-  phev:[()=>`${cur()} на 100 км`,()=>"денег — на электричество",()=>"бензина на 100 км пути",()=>"из сети на 100 км пути",()=>"км проехано"],
+  ev:[()=>`${cur()} на 100 км`,()=>"кВт·ч на 100 км",()=>`${cur()} за кВт·ч в среднем`,()=>"км пройдено",()=>"кВт·ч заряжено"],
+  phev:[()=>`${cur()} на 100 км`,()=>"денег — на электричество",()=>"бензина на 100 км пути",()=>"из сети на 100 км пути",()=>"км пройдено"],
 };
 function setFigLabels(hyb){ const sm=document.querySelectorAll(".figs .fig small"); FIG_LABELS[hyb?"phev":"ev"].forEach((f,i)=>{ sm[i].textContent=f(); }); }
 function hybridFigs(st,h,notes,how){
