@@ -1,0 +1,24 @@
+{
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
+  },
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "em-dash-overuse",
+        "value": "*",
+        "files": [
+          "app/*.html"
+        ],
+        "createdAt": "2026-10-19T03:50:17.648Z",
+        "reason": "Agent: Russian typography — the dash is required punctuation (dropped linking verb), not English AI cadence"
+      }
+    ]
+  }
+}

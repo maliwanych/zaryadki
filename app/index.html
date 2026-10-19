@@ -76,6 +76,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .fig{background:var(--panel);padding:12px 14px}
 .fig b{display:block;font-size:22px;font-weight:600;line-height:1.2}
 .fig small{font-size:13px;color:var(--muted);display:block;margin-top:2px}
+.figs.five .fig:nth-child(5){grid-column:1/-1}   /* no free charges: «сэкономлено» hidden, the fifth cell takes the row */
 .note{font-size:13px;color:var(--muted);margin:8px 2px 0}
 
 section{margin-top:28px}
@@ -172,7 +173,8 @@ label.check small{font-size:12px;color:var(--muted)}
 dialog{border:0;padding:0;background:var(--panel);color:var(--ink);width:100%;max-width:560px;margin:auto auto 0;border-radius:18px 18px 0 0;max-height:92vh}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 html.modal-open,html.modal-open body{overflow:hidden;overscroll-behavior:none}
-.sheet{padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto;max-height:92vh;overscroll-behavior:contain}
+.sheet{padding:18px 16px;overflow-y:auto;max-height:92vh;overscroll-behavior:contain}
+.sheet::after{content:"";display:block;height:env(safe-area-inset-bottom,0px)}   /* room above the iPhone home bar, on top of the 18 px */
 .sheet h2{margin-bottom:14px}
 .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
 .fgrid .full{grid-column:1/-1}
@@ -193,7 +195,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .btn.primary{background:var(--ink);color:var(--plate);border-color:var(--ink)}
 .btn.danger{color:var(--red-ink);flex:0 0 auto;padding:13px 16px}
 .btn:disabled{opacity:.5}
-.btn.wipe{background:var(--red);border-color:var(--red);color:#fff}
+.btn.wipe{background:#C21F2B;border-color:#C21F2B;color:#fff}   /* signal red in both themes: white on the dark --red is 3.8:1 */
 .btn.wipe-link{width:100%;margin-top:10px;background:none;color:var(--red-ink)}
 
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--plate);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
@@ -283,13 +285,13 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     </div>
   </div>
 
-  <div class="figs">
+  <div class="figs" id="figs">
     <div class="fig"><b id="fPer100">—</b><small><span class="cur">BYN</span> на 100 км</small></div>
     <div class="fig"><b id="fCons">—</b><small>кВт·ч на 100 км</small></div>
     <div class="fig"><b id="fPrice">—</b><small><span class="cur">BYN</span> за кВт·ч в среднем</small></div>
     <div class="fig"><b id="fKm">—</b><small>км пройдено</small></div>
     <div class="fig"><b id="fKwh">—</b><small>кВт·ч заряжено</small></div>
-    <div class="fig"><b id="fSaved">—</b><small id="fSavedL">сэкономлено на бесплатных зарядках</small></div>
+    <div class="fig" id="figSaved"><b id="fSaved">—</b><small id="fSavedL">сэкономлено на бесплатных зарядках</small></div>
   </div>
   <div class="note" id="perNote"></div></div>
 
@@ -590,7 +592,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.21";
+const APP_VERSION = "1.0.22";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -654,7 +656,10 @@ function registerSW(){
   navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(!wantReload || reloaded) return; reloaded=true; location.reload(); });
 }
 
-function toast(t){ const el=$("toast"); el.textContent=t; el.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove("on"),2200); }
+// cleared once hidden, so a screen reader doesn't find an old message; set a moment after clearing, so a repeat is announced again
+function toast(t){ const el=$("toast"); clearTimeout(toast._t); el.textContent="";
+  toast._t=setTimeout(()=>{ el.textContent=t; el.classList.add("on");
+    toast._t=setTimeout(()=>{ el.classList.remove("on"); toast._t=setTimeout(()=>{ el.textContent=""; },250); },2200); },50); }
 
 /* ---------- register (meter drums) ---------- */
 function buildRegister(el, intDigits){
@@ -670,8 +675,8 @@ function setRegister(el, value){
   const v = Math.max(0, Math.min(value, Math.pow(10,el._digits)-0.01));
   const [i,d] = v.toFixed(2).split(".");
   const chars = (i.padStart(el._digits,"0")+d).split("");
-  const h = el._strips[0].firstChild.getBoundingClientRect().height || 40;
-  chars.forEach((c,k)=>{ el._strips[k].style.transform = `translateY(-${Number(c)*h}px)`; });
+  // in rows of the drum's own height (--h), not measured pixels: a render while «Обзор» is hidden lands right too
+  chars.forEach((c,k)=>{ el._strips[k].style.transform = `translateY(calc(var(--h) * -${Number(c)}))`; });
   el.setAttribute("aria-label", fmt(value));
 }
 buildRegister($("regByn"),5);
@@ -752,7 +757,7 @@ function hybridFigs(st,h,notes,how){
   $("fPrice").textContent=h.l100!=null?`${ap}${fmt(h.l100,1)} л`:"—";
   $("fKm").textContent=h.kwh100!=null?`${ap}${fmt(h.kwh100,1)} кВт·ч`:"—";
   $("fKwh").textContent=st.km>0?fmtInt(st.km):"—";
-  $("fSaved").textContent=st.freeKwh>0?`≈${fmt(st.saved,0)} ${cur()}`:"—";
+  $("fSaved").textContent=st.saved>0?`≈${fmt(st.saved,0)} ${cur()}`:"—";
   $("fSavedL").textContent="сэкономлено на бесплатных зарядках";
   if(h.win) notes.push(`Цена — от полного бака до полного: ${h.win.n} ${plural(h.win.n,"отрезок","отрезка","отрезков")}, ${fmtInt(h.win.km)} км.`);
   else if(st.km>0) notes.push("≈ по всем записям с начала учёта. Для точной цены нужны две заправки «полный бак» с пробегом.");
@@ -792,11 +797,12 @@ function render(){
 
   const notes = [], how = [];   // notes: in sight (actions, warnings); how: under «Как это считается»
   setFigLabels(hyb);
+  $("figSaved").hidden = !(st.freeKwh>0); $("figs").classList.toggle("five", !(st.freeKwh>0));   // «сэкономлено» only for those who had free charges
   if(hyb) hybridFigs(st,h,notes,how); else {
   $("fPrice").textContent = st.rKwh>0 ? fmt(st.rByn/st.rKwh) : "—";
   $("fKm").textContent = st.km>0 ? fmtInt(st.km) : "—";
   $("fKwh").textContent = fmt(st.totKwh,1);
-  $("fSaved").textContent = st.freeKwh>0 ? `≈${fmt(st.saved,0)} ${cur()}` : "—";
+  $("fSaved").textContent = st.saved>0 ? `≈${fmt(st.saved,0)} ${cur()}` : "—";
   $("fSavedL").textContent = st.freeKwh>0 ? `сэкономлено на бесплатных ${fmt(st.freeKwh,0)} кВт·ч` : "сэкономлено на бесплатных зарядках";
   if(st.kmR>0 && st.paid<=0){
     // came with more range than is paid for so far (e.g. 10 km after purchase): the figures would be negative
@@ -921,7 +927,7 @@ function renderList(ss){
         if(s.socFrom!=null&&s.socTo!=null) bits.push(`${s.socFrom}→${s.socTo}%`); else if(s.socTo!=null) bits.push(`до ${s.socTo}%`);
         if(s.odo!=null) bits.push(`${fmtInt(s.odo)} км`);
         if(s.kwhBat&&s.kwh) bits.push(`потери ${fmt((s.kwh/s.kwhBat-1)*100,0)}%`);
-        b.innerHTML=`<span class="stripe ${t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} ${cur()}</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
+        b.innerHTML=`<span class="stripe ${isFree(s)?"t-free":t.cls}"></span><span class="st"></span><span class="sum">${fmt(s.byn||0)} ${cur()}</span><span class="meta"></span><span class="meta r">${fmt(s.kwh||0)} кВт·ч · ${fmt(p)}</span>`;
         b.querySelector(".st").textContent = s.station || "Без названия";
         b.querySelectorAll(".meta")[0].textContent = bits.join(" · ");
         b.addEventListener("click",()=>openSess(s));
@@ -1196,7 +1202,7 @@ function renderMonths(st){
         <div><b>${M.price!=null?fmt(M.price):"—"}${delta(M.price,P&&P.price,true,2)}</b><small>${cur()} за кВт·ч</small></div>
         <div><b>${fmt(M.costs)} ${cur()}</b><small>прочие расходы</small></div>
         <div><b>${fmt(M.kwh,1)}</b><small>кВт·ч, ${M.n} ${plural(M.n,"зарядка","зарядки","зарядок")}</small></div>
-        <div><b>${M.saved?`≈${fmt(M.saved,0)} ${cur()}`:"—"}</b><small>сэкономлено на бесплатных</small></div>
+        ${S.sessions.some(isFree)?`<div><b>${M.saved?`≈${fmt(M.saved,0)} ${cur()}`:"—"}</b><small>сэкономлено на бесплатных</small></div>`:""}
       </div>
       ${mixTot?`<div class="mix"><div class="mixbar">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
       ${notes.length?`<p class="mnote">${notes.join(" ")}</p>`:""}`;

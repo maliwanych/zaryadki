@@ -1285,7 +1285,7 @@ test.describe("дизайн-ревью: подписи, тёмная тема, �
     const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
     const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
     const bgOf = el => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length && (c.length < 4 || c[3] > 0.9)) return c; } return rgb(getComputedStyle(document.body).backgroundColor); };
-    const scope = document.querySelector("dialog[open]") || document;
+    const open = document.querySelectorAll("dialog[open]"), scope = open[open.length - 1] || document;   // верхнее окно
     const small = [], low = [];
     scope.querySelectorAll("button, a[href], input:not([type=hidden]), select").forEach(el => {
       if (!vis(el) || el.closest("p")) return;
@@ -1352,11 +1352,79 @@ test.describe("дизайн-ревью: подписи, тёмная тема, �
     });
   }
 
+  for (const colorScheme of ["light", "dark"]) {
+    test(`окно «Удалить все данные»: контраст и размеры (${colorScheme === "light" ? "светлая" : "тёмная"} тема)`, async ({ page }) => {
+      // ревью (детектор): белое на красном тёмной темы было 3,8:1 у кнопки «Удалить всё»
+      await page.emulateMedia({ colorScheme });
+      await page.goto("./");
+      await importBackup(page);
+      await page.click("#btnSettings");
+      await page.click("#btnWipe");
+      await expect(page.locator("#dlgWipe")).toBeVisible();
+      expect(await check(page)).toEqual({ small: [], low: [] });
+    });
+  }
+
+  test("сообщение исчезает вместе с текстом — диктор не наткнётся на старое", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnSettings");
+    await page.click("#formSet button[type=submit]");
+    await expect(page.locator("#toast")).toHaveText("Настройки сохранены");
+    await expect(page.locator("#toast")).toHaveText("", { timeout: 4000 });
+  });
+
   test("сообщения вроде «Зарядка сохранена» озвучиваются экранным диктором", async ({ page }) => {
     await page.goto("./");
     await expect(page.locator("#toast")).toHaveAttribute("role", "status");
     await expect(page.locator("#toast")).toHaveAttribute("aria-live", "polite");
   });
+});
+
+test("барабаны показывают сумму точно, даже если зарядку добавили с другой вкладки", async ({ page }) => {
+  // ревью: высота цифры мерялась на экране; пока «Обзор» скрыт, она была 0 и барабаны вставали между цифрами
+  await page.goto("./");
+  await importBackup(page);
+  await page.click("#tabs [data-tab=sessions]");
+  await page.click("#btnAdd");
+  await page.fill("#formSess [name=station]", "Тест");
+  await page.fill("#formSess [name=kwh]", "10");
+  await page.fill("#formSess [name=byn]", "3,33");
+  await page.click("#btnSaveSess");
+  await page.click("#tabs [data-tab=overview]");
+  await page.waitForTimeout(1300);                          // барабаны докрутились
+  const r = await page.evaluate(() => {
+    const reg = document.getElementById("regByn");
+    const d = [...reg.querySelectorAll(".drum")].map(el => {
+      const h = el.getBoundingClientRect().height, off = el.getBoundingClientRect().top - el.firstChild.getBoundingClientRect().top;
+      return { n: Math.round(off / h), exact: Math.abs(off - Math.round(off / h) * h) < 1 };
+    });
+    return { shown: d.map(x => x.n).join(""), exact: d.every(x => x.exact), label: reg.getAttribute("aria-label") };
+  });
+  expect(r.exact).toBe(true);                               // ровно на цифре, не между
+  expect(r.shown).toBe(r.label.replace(/\D/g, "").padStart(r.shown.length, "0"));
+});
+
+test("бесплатные зарядки: зелёная полоска в списке; «сэкономлено» — только у тех, у кого они были", async ({ page }) => {
+  // отзыв владельца: без бесплатных зарядок поле не должно мозолить глаза
+  await page.goto("./");
+  const add = async (kwh, byn) => {
+    await page.click("#btnAdd");
+    await page.fill("#formSess [name=station]", "Станция");
+    await page.fill("#formSess [name=kwh]", kwh);
+    await page.fill("#formSess [name=byn]", byn);
+    await page.click("#btnSaveSess");
+    await expect(page.locator("#dlgSess")).toBeHidden();
+  };
+  await add("20", "10");
+  await expect(page.locator("#figSaved")).toBeHidden();
+  await expect(page.locator("#months")).not.toContainText("сэкономлено");
+  await add("15", "0");
+  await expect(page.locator("#figSaved")).toBeVisible();
+  await expect(page.locator("#fSaved")).toContainText("BYN");
+  await expect(page.locator("#months")).toContainText("сэкономлено");
+  await page.click("#tabs [data-tab=sessions]");
+  await expect(page.locator("#list .sess .stripe.t-free")).toHaveCount(1);
 });
 
 test("значки: размеры как в manifest, у значков для iPhone и Android-маски нет прозрачных углов, все — в офлайн-кэше", async ({ page }) => {

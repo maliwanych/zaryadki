@@ -1,0 +1,602 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-19T06:24:04Z",
+  "title": "Design System: Зарядки",
+  "extensions": {
+    "colorMeta": {
+      "instrument-plate": {
+        "role": "neutral",
+        "displayName": "Instrument Plate",
+        "canonical": "#E4E8EC",
+        "tonalRamp": [
+          "#0A0B0D",
+          "#222528",
+          "#3F4246",
+          "#5E6265",
+          "#7F8386",
+          "#A2A5A9",
+          "#C6CACD",
+          "#ECEFF1"
+        ]
+      },
+      "panel-grey": {
+        "role": "neutral",
+        "displayName": "Panel Grey",
+        "canonical": "#F4F6F8",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#242527",
+          "#414244",
+          "#606163",
+          "#818284",
+          "#A3A5A7",
+          "#C7C9CB",
+          "#EDEEF0"
+        ]
+      },
+      "graphite-ink": {
+        "role": "primary",
+        "displayName": "Graphite Ink",
+        "canonical": "#18202B",
+        "tonalRamp": [
+          "#070B11",
+          "#1D2631",
+          "#3A434F",
+          "#58626F",
+          "#798391",
+          "#9BA6B4",
+          "#BFCAD9",
+          "#E8EFF8"
+        ]
+      },
+      "slate-muted": {
+        "role": "neutral",
+        "displayName": "Slate Muted",
+        "canonical": "#5B6673",
+        "tonalRamp": [
+          "#070C11",
+          "#1C2631",
+          "#39434F",
+          "#57626F",
+          "#788491",
+          "#9AA6B5",
+          "#BECBD9",
+          "#E8EFF9"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#CBD2D9",
+        "tonalRamp": [
+          "#090B0E",
+          "#20262B",
+          "#3D4348",
+          "#5C6268",
+          "#7D838A",
+          "#9FA6AD",
+          "#C3CAD1",
+          "#EBEFF3"
+        ]
+      },
+      "field-white": {
+        "role": "neutral",
+        "displayName": "Field White",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "drum-black": {
+        "role": "neutral",
+        "displayName": "Drum Black",
+        "canonical": "#161A20",
+        "tonalRamp": [
+          "#090B0F",
+          "#21252C",
+          "#3E4249",
+          "#5D6269",
+          "#7D838A",
+          "#A0A5AE",
+          "#C4CAD2",
+          "#EBEFF4"
+        ]
+      },
+      "drum-numeral": {
+        "role": "neutral",
+        "displayName": "Drum Numeral",
+        "canonical": "#F2F4F6",
+        "tonalRamp": [
+          "#0A0B0C",
+          "#242527",
+          "#414244",
+          "#606163",
+          "#818284",
+          "#A3A5A7",
+          "#C7C9CB",
+          "#EDEEF0"
+        ]
+      },
+      "signal-red": {
+        "role": "primary",
+        "displayName": "Signal Red",
+        "canonical": "#C21F2B",
+        "tonalRamp": [
+          "#2D0000",
+          "#660000",
+          "#8E0000",
+          "#B60921",
+          "#DF4143",
+          "#FF6865",
+          "#FF8E88",
+          "#FFD0C8"
+        ]
+      },
+      "ac-blue": {
+        "role": "secondary",
+        "displayName": "AC Blue",
+        "canonical": "#3A68A0",
+        "tonalRamp": [
+          "#000A24",
+          "#002355",
+          "#134277",
+          "#35639A",
+          "#5685BF",
+          "#78A8E5",
+          "#9BCDFF",
+          "#D3F1FF"
+        ]
+      },
+      "fuel-amber": {
+        "role": "secondary",
+        "displayName": "Fuel Amber",
+        "canonical": "#D9822B",
+        "tonalRamp": [
+          "#220000",
+          "#510000",
+          "#742500",
+          "#994700",
+          "#BF6A00",
+          "#E58D39",
+          "#FFB160",
+          "#FFE2B4"
+        ]
+      },
+      "fuel-button": {
+        "role": "secondary",
+        "displayName": "Fuel Button",
+        "canonical": "#AD5F1A",
+        "tonalRamp": [
+          "#200000",
+          "#4E0200",
+          "#712800",
+          "#954A00",
+          "#BB6B2A",
+          "#E18F50",
+          "#FFB374",
+          "#FFE2BE"
+        ]
+      },
+      "free-green": {
+        "role": "secondary",
+        "displayName": "Free Green",
+        "canonical": "#3E9B6A",
+        "tonalRamp": [
+          "#001301",
+          "#00340A",
+          "#005327",
+          "#027446",
+          "#399766",
+          "#60BB88",
+          "#85E0AB",
+          "#C9FDDC"
+        ]
+      },
+      "night-plate": {
+        "role": "neutral",
+        "displayName": "Night Plate",
+        "canonical": "#12161B",
+        "tonalRamp": [
+          "#090B0E",
+          "#21252B",
+          "#3E4248",
+          "#5D6268",
+          "#7E8389",
+          "#A0A6AC",
+          "#C4CAD1",
+          "#EBEFF3"
+        ]
+      },
+      "night-panel": {
+        "role": "neutral",
+        "displayName": "Night Panel",
+        "canonical": "#1B2027",
+        "tonalRamp": [
+          "#090B0F",
+          "#20252D",
+          "#3D424A",
+          "#5C626A",
+          "#7D838C",
+          "#9FA6AF",
+          "#C3CAD3",
+          "#EBEFF5"
+        ]
+      },
+      "night-ink": {
+        "role": "primary",
+        "displayName": "Night Ink",
+        "canonical": "#E7EBEF",
+        "tonalRamp": [
+          "#0A0B0D",
+          "#222528",
+          "#3F4246",
+          "#5E6265",
+          "#7F8386",
+          "#A2A5A9",
+          "#C6CACD",
+          "#ECEFF1"
+        ]
+      },
+      "night-muted": {
+        "role": "neutral",
+        "displayName": "Night Muted",
+        "canonical": "#8D98A5",
+        "tonalRamp": [
+          "#070C11",
+          "#1D2630",
+          "#39434E",
+          "#58626E",
+          "#798490",
+          "#9BA6B4",
+          "#BFCAD8",
+          "#E8EFF8"
+        ]
+      },
+      "night-hairline": {
+        "role": "neutral",
+        "displayName": "Night Hairline",
+        "canonical": "#2C343E",
+        "tonalRamp": [
+          "#080B10",
+          "#1E262F",
+          "#3A434D",
+          "#59626D",
+          "#7A838F",
+          "#9CA6B2",
+          "#C0CAD7",
+          "#E9EFF7"
+        ]
+      },
+      "night-field": {
+        "role": "neutral",
+        "displayName": "Night Field",
+        "canonical": "#232932",
+        "tonalRamp": [
+          "#080B10",
+          "#1F252E",
+          "#3C424C",
+          "#5B626C",
+          "#7C838E",
+          "#9EA6B1",
+          "#C2CAD6",
+          "#EAEFF6"
+        ]
+      },
+      "night-drum": {
+        "role": "neutral",
+        "displayName": "Night Drum",
+        "canonical": "#050608",
+        "tonalRamp": [
+          "#0A0B0D",
+          "#232528",
+          "#404245",
+          "#5F6165",
+          "#808286",
+          "#A3A5A9",
+          "#C7C9CD",
+          "#EDEEF1"
+        ]
+      },
+      "night-signal-red": {
+        "role": "primary",
+        "displayName": "Night Signal Red",
+        "canonical": "#E3505A",
+        "tonalRamp": [
+          "#2B0000",
+          "#620000",
+          "#890012",
+          "#B11B32",
+          "#DA4752",
+          "#FF6D74",
+          "#FF9397",
+          "#FFD1D0"
+        ]
+      },
+      "night-red-text": {
+        "role": "primary",
+        "displayName": "Night Red Text",
+        "canonical": "#F07178",
+        "tonalRamp": [
+          "#270000",
+          "#5B0002",
+          "#81001E",
+          "#A82E3D",
+          "#CF535D",
+          "#F7777E",
+          "#FF9CA1",
+          "#FFD6D6"
+        ]
+      },
+      "night-ac-blue": {
+        "role": "secondary",
+        "displayName": "Night AC Blue",
+        "canonical": "#78A2D8",
+        "tonalRamp": [
+          "#000A21",
+          "#002450",
+          "#1C4272",
+          "#3B6394",
+          "#5C85B9",
+          "#7EA8DE",
+          "#A1CCFF",
+          "#D6F1FF"
+        ]
+      },
+      "night-dc-grey": {
+        "role": "secondary",
+        "displayName": "Night DC Grey",
+        "canonical": "#C9D1DA",
+        "tonalRamp": [
+          "#080B0F",
+          "#20262C",
+          "#3C434A",
+          "#5B626A",
+          "#7C838B",
+          "#9EA6AF",
+          "#C2CAD3",
+          "#EAEFF5"
+        ]
+      },
+      "night-fuel": {
+        "role": "secondary",
+        "displayName": "Night Fuel",
+        "canonical": "#E8A04F",
+        "tonalRamp": [
+          "#1E0100",
+          "#4A0B00",
+          "#6D2E00",
+          "#904F00",
+          "#B57012",
+          "#DB9442",
+          "#FFB868",
+          "#FFE5B7"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Цифры на барабанах счётчика «Потрачено»."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Значения в сетке цифр «Обзора»."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Заголовки разделов, месяцев и листов; главная кнопка."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Основной текст, названия станций, поля ввода (17px)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Подписи под цифрами и полями, мета-строки."
+      },
+      "display-small": {
+        "displayName": "Display Small",
+        "purpose": "Малый счётчик."
+      },
+      "display-separator": {
+        "displayName": "Display Separator",
+        "purpose": "Запятая счётчика."
+      },
+      "figure-large": {
+        "displayName": "Figure Large",
+        "purpose": "Реальный запас хода на полном заряде."
+      },
+      "headline-small": {
+        "displayName": "Headline Small",
+        "purpose": "Пробег, итоги месяца под счётчиком."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Числа карточек месяцев, сумма расходов."
+      },
+      "title-small": {
+        "displayName": "Title Small",
+        "purpose": "Строка шапки, сегменты."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Вкладки, плашки, сообщения."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Подсказки, легенды, подписи графика."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Только подпись линии «всего» на графике."
+      }
+    },
+    "shadows": [
+      {
+        "name": "drum-cylinder",
+        "value": "inset 0 6px 8px -6px rgba(0,0,0,.8), inset 0 -6px 8px -6px rgba(0,0,0,.8)",
+        "purpose": "Только барабаны счётчика."
+      },
+      {
+        "name": "floating-list",
+        "value": "0 10px 28px rgba(0,0,0,.28)",
+        "purpose": "Выпадающие подсказки станций и АЗС."
+      },
+      {
+        "name": "sheet-scrim",
+        "value": "rgba(0,0,0,.45)",
+        "purpose": "Затемнение страницы под листом снизу (dialog::backdrop)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "drum-roll",
+        "value": "transform 1.1s cubic-bezier(.2,.8,.2,1)",
+        "purpose": "Докрутка барабанов при изменении суммы; отключается при prefers-reduced-motion."
+      },
+      {
+        "name": "toast-fade",
+        "value": "opacity .2s",
+        "purpose": "Появление и исчезновение сообщения внизу экрана."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "content-max",
+        "value": "560px"
+      },
+      {
+        "name": "check-width",
+        "value": "400px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Главная кнопка",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Одна на лист: «Сохранить», «Настроить машину».",
+      "html": "<button class=\"ds-btn-primary\">Сохранить</button>",
+      "css": ".ds-btn-primary{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;background:#18202B;color:#E4E8EC;border:1px solid #18202B;border-radius:10px;padding:13px 24px;min-height:44px;font-weight:600;font-size:16px;cursor:pointer}.ds-btn-primary:hover{background:#2B323C}.ds-btn-primary:focus-visible{outline:2px solid #3A68A0;outline-offset:2px}"
+    },
+    {
+      "name": "Вторичная кнопка",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "«Отмена», кнопки блока «Данные».",
+      "html": "<button class=\"ds-btn\">Отмена</button>",
+      "css": ".ds-btn{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;background:#FFFFFF;color:#18202B;border:1px solid #CBD2D9;border-radius:10px;padding:13px 24px;min-height:44px;font-weight:600;font-size:16px;cursor:pointer}.ds-btn:hover{border-color:#5B6673}.ds-btn:focus-visible{outline:2px solid #3A68A0;outline-offset:2px}"
+    },
+    {
+      "name": "Добавить зарядку",
+      "kind": "button",
+      "refersTo": "button-add",
+      "description": "Главное действие, закреплено внизу экрана.",
+      "html": "<button class=\"ds-btn-add\">Добавить зарядку</button>",
+      "css": ".ds-btn-add{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;width:100%;max-width:528px;background:#18202B;color:#E4E8EC;border:0;border-radius:12px;padding:15px;font-weight:600;font-size:17px;cursor:pointer}.ds-btn-add:hover{background:#2B323C}.ds-btn-add:focus-visible{outline:2px solid #3A68A0;outline-offset:2px}"
+    },
+    {
+      "name": "Ссылка-кнопка",
+      "kind": "button",
+      "refersTo": "link-button",
+      "description": "«Настройки», «Обновить», «Как это считается».",
+      "html": "<button class=\"ds-link\">Настройки</button>",
+      "css": ".ds-link{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;background:none;border:0;color:#3A68A0;font-weight:500;font-size:16px;min-height:44px;min-width:44px;padding:6px 0;cursor:pointer}.ds-link:hover{text-decoration:underline}.ds-link:focus-visible{outline:2px solid #3A68A0;outline-offset:2px}"
+    },
+    {
+      "name": "Поле ввода",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Подпись над полем всегда видна, в поле — пример.",
+      "html": "<label class=\"ds-label\">Заряжено, кВт·ч<input class=\"ds-input\" inputmode=\"decimal\" placeholder=\"0,00\"></label>",
+      "css": ".ds-label{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;gap:4px;font-size:13px;color:#5B6673;max-width:240px}.ds-input{font:inherit;font-size:17px;color:#18202B;background:#FFFFFF;border:1px solid #CBD2D9;border-radius:10px;padding:10px 12px}.ds-input:focus-visible{outline:2px solid #3A68A0;outline-offset:2px}"
+    },
+    {
+      "name": "Сегменты типа зарядки",
+      "kind": "chip",
+      "refersTo": "segment-selected",
+      "description": "AC / DC город / Трасса; выбранный — графит.",
+      "html": "<div class=\"ds-seg\"><button aria-pressed=\"true\">AC</button><button>DC город</button><button>Трасса</button></div>",
+      "css": ".ds-seg{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #CBD2D9;border-radius:10px;overflow:hidden;max-width:360px}.ds-seg button{font:inherit;background:#FFFFFF;color:#18202B;border:0;border-left:1px solid #CBD2D9;padding:10px 4px;min-height:44px;font-size:15px;cursor:pointer}.ds-seg button:first-child{border-left:0}.ds-seg button[aria-pressed=true]{background:#18202B;color:#E4E8EC;font-weight:600}.ds-seg button:focus-visible{outline:2px solid #3A68A0;outline-offset:-2px}"
+    },
+    {
+      "name": "Вкладки",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Четыре вкладки во всю ширину, липкие под шапкой.",
+      "html": "<nav class=\"ds-tabs\"><button aria-selected=\"true\">Обзор</button><button>Зарядки</button><button>Расходы</button><button>Напоминания</button></nav>",
+      "css": ".ds-tabs{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;display:grid;grid-template-columns:repeat(4,1fr);background:#E4E8EC;border-bottom:1px solid #CBD2D9;max-width:400px}.ds-tabs button{font:inherit;background:none;border:0;border-bottom:2px solid transparent;padding:12px 2px;font-size:14px;color:#5B6673;cursor:pointer}.ds-tabs button[aria-selected=true]{color:#18202B;font-weight:600;border-bottom-color:#18202B}.ds-tabs button:focus-visible{outline:2px solid #3A68A0;outline-offset:-2px}"
+    },
+    {
+      "name": "Карточка с цифрой",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Плоская карточка с рамкой, значение и подпись.",
+      "html": "<div class=\"ds-card\"><b>7,5</b><small>BYN на 100 км</small></div>",
+      "css": ".ds-card{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;background:#F4F6F8;border:1px solid #CBD2D9;border-radius:14px;padding:12px 14px;max-width:180px;color:#18202B}.ds-card b{display:block;font-size:22px;font-weight:600;line-height:1.2}.ds-card small{display:block;font-size:13px;color:#5B6673;margin-top:2px}"
+    },
+    {
+      "name": "Барабанный счётчик",
+      "kind": "custom",
+      "refersTo": "drum",
+      "description": "Подпись «Потрачено»: барабаны целых и красные барабаны копеек.",
+      "html": "<div class=\"ds-reg\"><span>0</span><span>0</span><span>2</span><span>9</span><span>6</span><i>,</i><span class=\"dec\">6</span><span class=\"dec\">6</span><em>BYN</em></div>",
+      "css": ".ds-reg{font-family:Onest,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-variant-numeric:tabular-nums;display:flex;gap:3px;align-items:flex-end;font-size:38px;font-weight:600}.ds-reg span{width:34px;height:52px;display:flex;align-items:center;justify-content:center;background:#161A20;color:#F2F4F6;border-radius:4px;box-shadow:inset 0 6px 8px -6px rgba(0,0,0,.8),inset 0 -6px 8px -6px rgba(0,0,0,.8)}.ds-reg span.dec{background:#C21F2B;color:#fff}.ds-reg i{font-style:normal;font-size:28px;color:#5B6673;width:6px}.ds-reg em{font-style:normal;font-size:15px;font-weight:500;color:#5B6673;margin-left:8px;padding-bottom:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Приборная панель",
+    "overview": "Интерфейс читается, как панель машины: спокойный светло-серый «щиток» (тёмный графит ночью), крупные цифры и единственный сигнальный красный. Человек открывает приложение у зарядной станции, одной рукой, и за секунду видит главное: сколько потрачено и сколько стоит километр. Всё остальное — тихие карточки и подписи, которые не спорят с цифрами.\n\nПлотность средняя: один столбец до 560 px, крупная главная кнопка внизу, карточки с тонкой рамкой без теней. Характер компонентов — «спокойно и точно»: ничего не кричит, одна тёмная главная кнопка, остальные действия — контур или синий текст. Узнаваемая деталь — механический счётчик с барабанами на «Обзоре», тот же мотив, что в значке приложения.\n\nПодтверждённые запреты: никаких градиентов и неонового свечения «под электричество» и никакого игрового стиля (маскоты, эмодзи, конфетти).",
+    "keyCharacteristics": [
+      "Цифры — главный герой: моноширинные цифры (`tnum`) везде, барабаны — только у счётчика потраченного.",
+      "Один сигнальный красный: копейки на барабанах, «Трасса», предупреждения и удаление.",
+      "Плоские слои тона вместо теней: щиток → карточка → поле.",
+      "Сквозной цветовой код зарядок: AC — синий, DC — графит, трасса — красный, бесплатно — зелёный, бензин — янтарный.",
+      "Две полноценные темы: светлая и тёмная, плюс «как в телефоне»."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Red Rule",
+        "section": "colors",
+        "body": "Красный — только сигнал: копейки на барабанах, «Трасса», предупреждения и удаление. Не для украшения и не для акцента «просто так». Красный текст в тёмной теме — Night Red Text (night-red-text), заливки — Night Signal Red."
+      },
+      {
+        "name": "The Charge Colour Code Rule",
+        "section": "colors",
+        "body": "AC — синий, DC — графит (ночью — светло-серый), трасса — красный, бесплатно — зелёный, бензин — янтарный. Один и тот же код в графике, полосках списка, долях и легендах; новый экран не вводит своих цветов для типов."
+      },
+      {
+        "name": "The Instrument Numerals Rule",
+        "section": "typography",
+        "body": "Все числа — моноширинными цифрами, чтобы суммы и километры стояли ровно, как на приборе. Барабаны — только у счётчика потраченного; остальные цифры — обычный текст крупным весом."
+      },
+      {
+        "name": "The Flat Plate Rule",
+        "section": "elevation",
+        "body": "Карточки, кнопки и поля не отбрасывают теней. Если что-то нужно выделить — тоном и рамкой, а не тенью."
+      }
+    ],
+    "dos": [
+      "**Do** держать одну тёмную главную кнопку на экране или листе; остальное — контур или синий текст.",
+      "**Do** делать кнопки не меньше 44 px и держать контраст текста не ниже 4,5 : 1 (крупного — 3 : 1) в обеих темах — это проверяет автотест.",
+      "**Do** брать цвета типов зарядки только из сквозного кода (The Charge Colour Code Rule).",
+      "**Do** задавать `color-scheme` вместе с темой, чтобы поля даты и списки рисовались в ней же.",
+      "**Do** проверять каждый экран на ширине 400 px в светлой и тёмной теме."
+    ],
+    "donts": [
+      "**Don't** использовать градиенты и неоновое свечение «под электричество» (решение владельца); единственное исключение — функциональное растворение фона под главной кнопкой.",
+      "**Don't** вводить игровой стиль: маскоты, эмодзи вместо значков, конфетти (решение владельца).",
+      "**Don't** ставить тени карточкам и кнопкам (The Flat Plate Rule).",
+      "**Don't** использовать красный как украшение или для красного текста в тёмной теме — для текста есть Night Red Text (The Signal Red Rule).",
+      "**Don't** подключать шрифты, значки или библиотеки с чужих сайтов: всё лежит в app/."
+    ]
+  }
+}
