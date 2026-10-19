@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-19T06:24:04Z",
+  "generatedAt": "2026-10-19T08:31:48Z",
   "title": "Design System: Зарядки",
   "extensions": {
     "colorMeta": {
@@ -436,6 +436,10 @@
       "micro": {
         "displayName": "Micro",
         "purpose": "Только подпись линии «всего» на графике."
+      },
+      "page-title": {
+        "displayName": "Page Title",
+        "purpose": "Заголовок страницы конфиденциальности (системный шрифт)."
       }
     },
     "shadows": [

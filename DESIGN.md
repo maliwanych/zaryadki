@@ -101,6 +101,11 @@ typography:
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.45
+  page-title:
+    fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+    fontSize: "24px"
+    fontWeight: 700
+    lineHeight: 1.5
   micro:
     fontFamily: "Onest, system-ui, sans-serif"
     fontSize: "11px"
