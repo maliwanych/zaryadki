@@ -8,3 +8,7 @@ Thumbs.db
 *backup*.json
 !tests/fixtures/sample-backup.json
 *.csv
+
+# impeccable: история ревью (в ней пути этого компьютера) и рабочие файлы живого режима — только локально
+.impeccable/critique/
+.impeccable/live/
