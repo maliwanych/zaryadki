@@ -1109,6 +1109,15 @@ test.describe("режим гибрида с розеткой", () => {
     await expect(page.locator("#formOdo [name=range]")).toBeHidden(); // запас хода гибриду не нужен
   });
 
+  test("стоимость владения у гибрида — вместе с бензином", async ({ page }) => {
+    // ревью: «Владение обходится в … на 100 км» у гибрида считалось только по зарядкам
+    await page.goto("./");
+    await importJson(page, { ...HYB, costs: [{ id: "k1", byn: 100, date: "2026-07-02", note: "Мойка", kind: "run" }] });
+    await page.click("#tabs [data-tab=costs]");
+    // энергия 15,7 на 100 км (как на «Обзоре») + мойка 100 BYN на 1 000 км = 10,0
+    await expect(page.locator("#ownNote")).toContainText("25,7 BYN на 100 км: 15,7 зарядки и бензин плюс 10,0 прочее");
+  });
+
   test("пока полных баков меньше двух — «≈ по всем записям»", async ({ page }) => {
     await page.goto("./");
     await importJson(page, { ...HYB, fuel: HYB.fuel.map(f => ({ ...f, full: f.id === "f1" })) });
