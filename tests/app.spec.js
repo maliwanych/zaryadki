@@ -1084,7 +1084,7 @@ test.describe("режим гибрида с розеткой", () => {
     await page.click("#btnSettings");                            // полные настройки
     await expect(page.locator("#ptSeg [data-p=phev]")).toHaveAttribute("aria-pressed", "true");
     for (const n of ["startRange", "carCons", "capKwh"]) await expect(set.locator(`[name=${n}]`)).toBeHidden();
-    await expect(set.getByText("зарядили и заправили")).toBeVisible();
+    await expect(set.getByText("все зарядки и заправки")).toBeVisible();
     await page.click("#ptSeg [data-p=ev]");
     await expect(set.locator("[name=capKwh]")).toBeVisible();
   });
@@ -1328,6 +1328,9 @@ test("«Настройки» — в шапке на любой вкладке, �
   await expect(page.locator("#btnXImport")).toHaveCount(0);
   await page.click("#btnSettings");
   for (const id of ["#btnJson", "#btnXlsx", "#btnImport"]) await expect(page.locator(`#dlgSet ${id}`)).toBeVisible();
+  // «Данные» — под кнопками формы: они действуют сразу, «Сохранить» к ним не относится (без поясняющей надписи)
+  const y = async sel => (await page.locator(sel).boundingBox()).y;
+  expect(await y("#formSet button[type=submit]")).toBeLessThan(await y("#btnJson"));
   const chooser = page.waitForEvent("filechooser");
   await page.click("#btnImport");
   await chooser;
