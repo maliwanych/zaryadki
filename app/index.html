@@ -190,6 +190,15 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .t-free{background:#3E9B6A}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--plate);font-weight:600}
 .hint{font-size:12px;color:var(--muted);margin:0}
+.flabel{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.when{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.when b{display:block;font-weight:500}
+.when .flabel{margin-bottom:0}
+.exact summary{display:flex;align-items:center;gap:6px;min-height:44px;color:var(--ac);font-weight:500;cursor:pointer;list-style:none}
+.exact summary::-webkit-details-marker{display:none}
+.exact summary::after{content:"▾";font-size:13px;transition:transform .2s}
+.exact[open] summary::after{transform:rotate(180deg)}
+.exact .fgrid{margin-top:2px;box-sizing:border-box}   /* details wraps content in its own slot: box-sizing does not inherit through it */
 .sheet-actions{display:flex;gap:10px;margin-top:18px}
 .btn{flex:1;border-radius:10px;padding:13px;font-weight:600;border:1px solid var(--line);background:var(--field)}
 .btn.primary{background:var(--ink);color:var(--plate);border-color:var(--ink)}
@@ -373,7 +382,6 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 <dialog id="dlgSess"><form class="sheet" id="formSess" method="dialog">
   <h2 id="sessTitle">Новая зарядка</h2>
   <div class="fgrid">
-    <label class="full">Дата и время<input type="datetime-local" name="ts" required></label>
     <div class="full stwrap">
       <label>Станция<input name="station" placeholder="Название или адрес станции" autocomplete="off" aria-autocomplete="list" aria-controls="stationSug"></label>
       <div class="sug" id="stationSug" role="listbox" aria-label="Ваши станции" hidden></div>
@@ -381,15 +389,20 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
     <p class="hint full" id="priceHint" hidden></p>
     <label>Заряжено, кВт·ч<input name="kwh" inputmode="decimal" required placeholder="0,00"></label>
     <label><span>Сумма, <span class="cur">BYN</span></span><input name="byn" inputmode="decimal" required placeholder="0,00"></label>
-    <div class="full"><label style="margin-bottom:4px">Тип</label>
+    <div class="full" role="group" aria-labelledby="typeLbl"><span class="flabel" id="typeLbl">Тип</span>
       <div class="seg" id="typeSeg">
         <button type="button" data-t="ac">AC</button><button type="button" data-t="dc">DC город</button><button type="button" data-t="hwy">Трасса</button>
       </div>
     </div>
-    <label class="full">Пробег по одометру, км<input name="odo" inputmode="numeric" placeholder="Посмотрите на панели"></label>
-    <label class="full">Батарея после, %<input name="socTo" inputmode="numeric" placeholder="100 — если зарядили полностью"></label>
-    <label class="full">Приняла машина, кВт·ч (необязательно)<input name="kwhBat" inputmode="decimal" placeholder="С экрана авто, если показывает"></label>
-    <p class="hint full">Пробег и проценты необязательны, но с ними считается точный расход. Заряжаетесь до 100% — расход между такими зарядками будет без оценок.</p>
+    <div class="full when" id="whenRow"><span><span class="flabel">Когда</span><b id="whenText"></b></span><button type="button" class="link-btn" id="btnWhen">Изменить</button></div>
+    <label class="full" id="whenField" hidden>Дата и время<input type="datetime-local" name="ts" required></label>
+    <details class="full exact" id="exactBox"><summary>Для точного расхода</summary>
+      <div class="fgrid">
+        <label class="full">Пробег по одометру, км<input name="odo" inputmode="numeric" placeholder="Посмотрите на панели"></label>
+        <label class="full">Батарея после, %<input name="socTo" inputmode="numeric" placeholder="100 — если зарядили полностью"></label>
+        <label class="full">Приняла машина, кВт·ч<input name="kwhBat" inputmode="decimal" placeholder="С экрана авто, если показывает"></label>
+      </div>
+    </details>
   </div>
   <div class="sheet-actions">
     <button type="button" class="btn danger" id="btnDel" hidden>Удалить</button>
@@ -592,7 +605,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.22";
+const APP_VERSION = "1.0.23";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1217,7 +1230,24 @@ document.querySelectorAll("dialog").forEach(d=>d.addEventListener("click",e=>{ i
 const lockPage=()=>document.documentElement.classList.toggle("modal-open", !!document.querySelector("dialog[open]"));
 document.querySelectorAll("dialog").forEach(d=>new MutationObserver(lockPage).observe(d,{attributes:true,attributeFilter:["open"]}));
 function setType(t){ curType=t; $("typeSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===t)); }
-$("typeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setType(b.dataset.t); });
+let typeTouched=false;   // chosen by hand in this sheet: the station no longer decides
+$("typeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b){ typeTouched=true; setType(b.dataset.t); } });
+// a station is usually charged the same way: DC in the mall after AC at home isn't silently saved as AC
+function stationType(name){ const s=S.sessions.filter(x=>x.station===name&&!glitch(x)).sort((a,b)=>a.ts<b.ts?1:-1)[0]; return s?s.type:null; }
+function typeByStation(){ if(typeTouched) return; const t=stationType($("formSess").station.value.trim()); if(t) setType(t); }
+// «Когда»: a line («Сегодня, 01:06»); the field opens on «Изменить»
+function whenLabel(v){
+  if(!v) return "—";
+  const day=v.slice(0,10), now=new Date(), today=localDate(now), yest=localDate(new Date(now.getFullYear(),now.getMonth(),now.getDate()-1));
+  const name = day===today?"Сегодня":day===yest?"Вчера":new Date(day+"T12:00").toLocaleDateString("ru-RU",{day:"numeric",month:"long",...(day.slice(0,4)!==today.slice(0,4)?{year:"numeric"}:{})});
+  return `${name}, ${v.slice(11,16)}`;
+}
+function showWhen(open){ const f=$("formSess"); $("whenText").textContent=whenLabel(f.ts.value); $("whenRow").hidden=open; $("whenField").hidden=!open; }
+$("btnWhen").addEventListener("click",()=>{ showWhen(true); const t=$("formSess").ts; t.focus(); try{ t.showPicker&&t.showPicker(); }catch(e){} });
+// «Для точного расхода»: folded until someone opens it — then it stays open for them; a charge with these numbers opens it
+const EXACT_KEY="ev-tracker-exact";
+const exactWanted=()=>{ try{ return localStorage.getItem(EXACT_KEY)==="1"; }catch(e){ return false; } };
+$("exactBox").querySelector("summary").addEventListener("click",()=>setTimeout(()=>{ try{ localStorage.setItem(EXACT_KEY,$("exactBox").open?"1":"0"); }catch(e){} }));
 
 function openSess(s){
   const f=$("formSess"); f.reset(); editingId = s?s.id:null;
@@ -1225,9 +1255,14 @@ function openSess(s){
   f.ts.value = s? s.ts.slice(0,16) : nowLocal();
   f.station.value = s?.station||""; f.kwh.value = s? String(s.kwh).replace(".",","):"";
   f.byn.value = s? String(s.byn).replace(".",","):""; f.odo.value = s?.odo??"";
-  f.socTo.value = s?.socTo??""; f.kwhBat.value = s?.kwhBat??"";
-  setType(s?.type || lastType());
+  f.socTo.value = s?.socTo??""; f.kwhBat.value = s?.kwhBat!=null?String(s.kwhBat).replace(".",","):"";   // a decimal comma, like the other fields
+  setType(s?.type || lastType()); typeTouched = !!s;
+  showWhen(false);
+  $("exactBox").open = !!(s && (s.odo!=null || s.socTo!=null || s.kwhBat!=null)) || exactWanted();
   bynTouched = !!s; applyPriceHint();
+  // the sheet focuses its first focusable element: a new charge — «Станция» (keyboard and recent stations right there);
+  // editing — the title, so no keyboard pops up over the record
+  if(s) $("sessTitle").tabIndex=-1; else $("sessTitle").removeAttribute("tabindex");
   $("dlgSess").showModal();
 }
 function lastType(){ const ss=S.sessions.slice().sort((a,b)=>a.ts<b.ts?1:-1); return ss[0]?.type||"dc"; }
@@ -1420,12 +1455,13 @@ function showStationSug(){
   const f=$("formSess");
   suggest(f.station,$("stationSug"),S.sessions.filter(s=>!glitch(s)).map(s=>({name:s.station,ts:s.ts})),
     n=>{ const p=stationPrice(n); return p===0?"бесплатно":p==null?"":`${fmt(p)} ${cur()}/кВт·ч`; },
-    ()=>{ applyPriceHint(); autoSum(); f.kwh.focus(); });
+    ()=>{ applyPriceHint(); autoSum(); typeByStation(); f.kwh.focus(); });
 }
 $("formSess").station.addEventListener("focus",showStationSug);
 $("formSess").station.addEventListener("blur",()=>{ $("stationSug").hidden=true; });
-$("formSess").station.addEventListener("input",()=>{ applyPriceHint(); autoSum(); showStationSug(); });
-$("formSess").station.addEventListener("change",()=>{ applyPriceHint(); autoSum(); });
+$("formSess").station.addEventListener("input",()=>{ applyPriceHint(); autoSum(); typeByStation(); showStationSug(); });
+$("formSess").station.addEventListener("change",()=>{ applyPriceHint(); autoSum(); typeByStation(); });
+$("formSess").ts.addEventListener("input",()=>{ $("whenText").textContent=whenLabel($("formSess").ts.value); });
 $("formSess").kwh.addEventListener("input",autoSum);
 $("formSess").byn.addEventListener("input",()=>{ bynTouched=true; });
 
