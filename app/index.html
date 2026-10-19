@@ -247,6 +247,10 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .mnote{font-size:12px;color:var(--muted);margin:10px 0 0}
 .banner{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .banner.warn{border-color:var(--red)}
+/* a phone with nothing on it: the welcome, the add button and the footer — no dashboard of zeros, tabs or header */
+body.fresh .top,body.fresh #tabs,body.fresh .tabbed:not(.ver),body.fresh main>section{display:none!important}
+/* first setup: only what the numbers need; the rest is in «Настройки» later */
+#formSet.first .adv{display:none!important}
 .welcome{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 16px;margin-bottom:14px}
 .welcome h2{font-size:20px;margin:0 0 8px}
 .welcome p{margin:0 0 12px;color:var(--muted);font-size:14px}
@@ -267,7 +271,7 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
   <div class="banner" id="undoBanner" hidden><span id="undoText">Копия загружена</span><button class="link-btn" id="btnUndo">Вернуть как было</button></div>
   <div class="banner ios" id="iosHint" hidden><span id="iosText"></span><button class="link-btn" id="btnIosHint">Понятно</button></div>
   <div class="banner warn" id="bakBanner" hidden><span id="bakText"></span><button class="link-btn" id="btnBak2">Сохранить копию</button></div>
-  <div class="top"><h1><span id="carName">Мой электромобиль</span> · учёт с <span id="since">—</span></h1><button class="link-btn" id="btnSettings">Настройки</button></div>
+  <div class="top"><h1><span id="carName">Мой электромобиль</span><span id="sinceWrap"> · учёт с <span id="since">—</span></span></h1><button class="link-btn" id="btnSettings">Настройки</button></div>
   <div class="welcome" id="welcome" hidden>
     <h2>Учёт зарядок</h2>
     <p>Записывайте зарядки, пробег и расходы на машину — трекер посчитает стоимость километра, расход и экономию. Все данные хранятся только на этом телефоне, никуда не отправляются. <a href="privacy.html">Подробнее</a></p>
@@ -447,36 +451,36 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 </form></dialog>
 
 <dialog id="dlgSet"><form class="sheet" id="formSet" method="dialog">
-  <h2>Настройки</h2>
+  <h2 id="setTitle">Настройки</h2>
   <div class="fgrid">
     <div class="full"><label style="margin-bottom:4px">Тип машины</label>
       <div class="seg two" id="ptSeg"><button type="button" data-p="ev">Электромобиль</button><button type="button" data-p="phev">Гибрид с розеткой</button></div>
     </div>
     <label class="full">Машина<input name="carName" placeholder="Например, Geely EX5" autocomplete="off"></label>
     <label>Начало учёта<input type="date" name="purchaseDate" required></label>
-    <label>Пробег в начале учёта, км<input name="startOdo" inputmode="numeric" required></label>
+    <label>Пробег в начале учёта, км<input name="startOdo" inputmode="numeric" required placeholder="С одометра"></label>
     <label class="ev-only">Запас хода в начале учёта, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
     <label>Валюта<select name="currency"><option value="BYN">BYN</option><option value="RUB">₽ (RUB)</option></select></label>
-    <p class="hint full">Смена валюты меняет только подпись — суммы не пересчитываются.</p>
-    <label class="full ev-only">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
-    <label class="full ev-only">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
-    <p class="hint full phev-only" hidden>Начало учёта — день, с которого вы записываете все зарядки и заправки. Для гибрида запас хода и ёмкость не нужны: считаем только по тому, что вы зарядили и заправили и сколько заплатили.</p>
-    <p class="hint full ev-only">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
-    <p class="hint full ev-only">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
-    <div class="full"><label style="margin-bottom:4px">Тема</label>
+    <p class="hint full adv">Смена валюты меняет только подпись — суммы не пересчитываются.</p>
+    <label class="full ev-only adv">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
+    <label class="full ev-only adv">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
+    <p class="hint full phev-only adv" hidden>Начало учёта — день, с которого вы записываете все зарядки и заправки. Для гибрида запас хода и ёмкость не нужны: считаем только по тому, что вы зарядили и заправили и сколько заплатили.</p>
+    <p class="hint full ev-only adv">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
+    <p class="hint full ev-only adv">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
+    <div class="full adv"><label style="margin-bottom:4px">Тема</label>
       <div class="seg" id="themeSeg"><button type="button" data-th="">Как в телефоне</button><button type="button" data-th="light">Светлая</button><button type="button" data-th="dark">Тёмная</button></div>
     </div>
   </div>
-  <h3 class="set-h">Данные</h3>
-  <p class="hint">Всё хранится только на этом телефоне. С резервной копией данные можно вернуть или перенести на другой телефон.</p>
-  <div class="set-data">
+  <h3 class="set-h adv">Данные</h3>
+  <p class="hint adv">Всё хранится только на этом телефоне. С резервной копией данные можно вернуть или перенести на другой телефон.</p>
+  <div class="set-data adv">
     <button type="button" class="btn" id="btnJson" hidden>Сохранить резервную копию</button>
     <button type="button" class="btn" id="btnXlsx" hidden>Выгрузить в Excel</button>
     <button type="button" class="btn" id="btnImport">Загрузить файл</button>
   </div>
-  <p class="hint">Резервная копия (.json) заменит данные, таблица Excel или CSV — добавит зарядки к ним.</p>
-  <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
-  <button type="button" class="btn wipe-link" id="btnWipe" hidden>Удалить все данные</button>
+  <p class="hint adv">Резервная копия (.json) заменит данные, таблица Excel или CSV — добавит зарядки к ним.</p>
+  <button type="button" class="btn adv" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
+  <button type="button" class="btn wipe-link adv" id="btnWipe" hidden>Удалить все данные</button>
   <div class="sheet-actions">
     <button type="button" class="btn" data-close>Отмена</button>
     <button type="submit" class="btn primary">Сохранить</button>
@@ -605,7 +609,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.23";
+const APP_VERSION = "1.0.24";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -774,7 +778,7 @@ function hybridFigs(st,h,notes,how){
   $("fSavedL").textContent="сэкономлено на бесплатных зарядках";
   if(h.win) notes.push(`Цена — от полного бака до полного: ${h.win.n} ${plural(h.win.n,"отрезок","отрезка","отрезков")}, ${fmtInt(h.win.km)} км.`);
   else if(st.km>0) notes.push("≈ по всем записям с начала учёта. Для точной цены нужны две заправки «полный бак» с пробегом.");
-  else notes.push("Укажите пробег — в заправке или кнопкой «Обновить», — чтобы посчитать стоимость километра.");
+  else if(S.sessions.length||S.fuel.length) notes.push("Укажите пробег — в заправке или кнопкой «Обновить», — чтобы посчитать стоимость километра.");
   how.push("Берём все зарядки и заправки между двумя заправками «полный бак» с пробегом и делим на километры между ними — так кусками купленный бензин не искажает цену.");
   how.push("«На 100 км пути» — сколько в среднем заправлено и заряжено на 100 км, включая километры, пройденные на другом источнике. Это не расход машины.");
   how.push("Данные машины (запас хода, расход с панели) не используются.");
@@ -786,9 +790,11 @@ function render(){
   st.h=h;
   const pd = new Date(S.settings.purchaseDate+"T00:00");
   $("since").textContent = pd.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"}).replace(/\s(г\.)$/,"\u00a0$1");   // «г.» never on a line of its own
-  $("carName").textContent = S.settings.carName || "Мой электромобиль";
+  $("carName").textContent = S.settings.carName || (S.configured===false ? "Учёт зарядок" : hyb ? "Мой гибрид" : "Мой электромобиль");
+  $("sinceWrap").hidden = S.configured===false;   // no start date before it is set
   document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
   $("welcome").hidden = S.configured!==false || DEMO;
+  document.body.classList.toggle("fresh", S.configured===false && !DEMO && !(S.sessions.length||S.fuel.length||S.costs.length||S.reminders.length||S.odoLog.length));
   backupNag();
   iosHint();
 
@@ -833,7 +839,7 @@ function render(){
     else notes.push("Запас хода ещё не указан — расход посчитан только по пройденным километрам и завышен.");
     if(st.early.length) notes.push(`${st.early.length} ${plural(st.early.length,"зарядка","зарядки","зарядок")} раньше начала учёта (${dShort(pd)}) не ${st.early.length===1?"входит":"входят"} в цену и расход — их километры не учтены.`);
     if(st.pending.length) notes.push(`${st.pending.length} ${plural(st.pending.length,"зарядка","зарядки","зарядок")} после этого пока не ${st.pending.length===1?"учтена":"учтены"} — обновите пробег и запас хода.`);
-  } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
+  } else { $("fPer100").textContent="—"; $("fCons").textContent="—"; if(S.sessions.length) notes.push("Укажите пробег и запас хода, чтобы посчитать стоимость километра."); }
   if(st.paidAvg!=null && st.freeKwh>0) how.push(`Платные зарядки в среднем по ${fmt(st.paidAvg)} ${cur()}/кВт·ч — по этой цене считается экономия.`);
   }
   // under the meter: this month's charging and the running cost of the car
@@ -1270,7 +1276,7 @@ let tab="overview";
 const FAB={overview:["Добавить зарядку",()=>openSess(null)], sessions:["Добавить зарядку",()=>openSess(null)],
            costs:["Добавить расход",()=>openCost(null)], rem:["Добавить напоминание",()=>openRem(null)]};
 // a hybrid gets two buttons on «Обзор» and «Зарядки»: a charge and a fill-up
-function updateFab(){ const two=HYB()&&(tab==="overview"||tab==="sessions"); $("btnAddFuel").hidden=!two; $("btnAdd").textContent=two?"+ Зарядка":FAB[tab][0]; }
+function updateFab(){ const two=HYB()&&(tab==="overview"||tab==="sessions"); $("btnAddFuel").hidden=!two; $("btnAdd").textContent=two?"+ Зарядка":(!S.sessions.length&&(tab==="overview"||tab==="sessions")?"Добавить первую зарядку":FAB[tab][0]); }
 function setTab(t){
   tab=t;
   $("tabs").querySelectorAll("button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
@@ -1340,7 +1346,10 @@ function setPt(p){
   document.querySelectorAll("#formSet .phev-only").forEach(el=>{ el.hidden=p!=="phev"; });
 }
 $("ptSeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-p]"); if(b) setPt(b.dataset.p); });
-function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate; f.startOdo.value=S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency); setPt(S.settings.powertrain==="phev"?"phev":"ev"); setThemeSeg(savedTheme());
+function openSettings(){ const f=$("formSet"); f.carName.value=S.settings.carName||""; f.purchaseDate.value=S.settings.purchaseDate;
+  // the first setup: short, and the odometer is typed in (a ready «0» passed «required» and made the cost per km wild)
+  const first=!S.configured; f.classList.toggle("first",first); $("setTitle").textContent=first?"Настройка машины":"Настройки";
+  f.startOdo.value=first?"":S.settings.startOdo; f.carCons.value=S.settings.carCons??""; f.capKwh.value=S.settings.capKwh??""; f.startRange.value=S.settings.startRange??""; f.currency.value=curCode(S.settings.currency); setPt(S.settings.powertrain==="phev"?"phev":"ev"); setThemeSeg(savedTheme());
   const u=readUndo(), b=$("btnUndoImport"); b.hidden=!u;
   if(u) b.dataset.label=`Вернуть данные, как было до ${new Date(u.at).toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}, ${new Date(u.at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}`;
   disarm(b);

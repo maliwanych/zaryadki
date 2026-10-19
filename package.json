@@ -1,6 +1,6 @@
 {
   "name": "zaryadki",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "private": true,
   "description": "Учёт зарядок и расходов на электромобиль — офлайн-приложение для телефона (PWA)",
   "scripts": {
