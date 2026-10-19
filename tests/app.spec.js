@@ -20,6 +20,43 @@ async function importBackup(page) {
   await expect(page.locator("#fKwh")).not.toHaveText("0,0");
 }
 
+test.describe("первый запуск", () => {
+  // ревью: приветствие лежало поверх нулевой панели, настройка — полные «Настройки», пробег уже «0»
+  test("на пустом телефоне — приветствие и кнопка зарядки, без нулевой панели, вкладок и шапки", async ({ page }) => {
+    await page.goto("./");
+    await expect(page.locator("#welcome")).toBeVisible();
+    for (const sel of ["#tabs", "#regByn", "#figs", "#btnSettings"]) await expect(page.locator(sel)).toBeHidden();
+    await expect(page.locator("#btnAdd")).toHaveText("Добавить первую зарядку");
+    await expect(page.locator(".ver a[href='privacy.html']")).toBeVisible();
+    await page.click("#btnAdd");                                 // записать можно сразу, настроить — потом
+    await page.fill("#formSess [name=kwh]", "20");
+    await page.fill("#formSess [name=byn]", "10");
+    await page.click("#btnSaveSess");
+    await expect(page.locator("#tabs")).toBeVisible();
+    await expect(page.locator("#welcome")).toBeVisible();
+    await expect(page.locator("h1")).toHaveText("Учёт зарядок", { useInnerText: true });   // без даты начала учёта, которую ещё не задали
+  });
+
+  test("«Настроить машину» — коротко, пробег вводится; потом — полные «Настройки»", async ({ page }) => {
+    await page.goto("./");
+    await page.click("#btnStart");
+    await expect(page.locator("#setTitle")).toHaveText("Настройка машины");
+    await expect(page.locator("#formSet [name=startOdo]")).toHaveValue("");
+    for (const sel of ["#formSet [name=capKwh]", "#formSet [name=carCons]", "#themeSeg", "#btnJson", "#btnWipe"]) await expect(page.locator(sel)).toBeHidden();
+    await page.click("#formSet button[type=submit]");
+    await expect(page.locator("#dlgSet")).toBeVisible();          // без пробега не сохраняется
+    await page.fill("#formSet [name=startOdo]", "1500");
+    await page.click("#formSet button[type=submit]");
+    await expect(page.locator("#tabs")).toBeVisible();
+    await expect(page.locator("#btnAdd")).toHaveText("Добавить первую зарядку");
+    await expect(page.locator("#perNote")).not.toContainText("Укажите пробег");
+    await page.click("#btnSettings");
+    await expect(page.locator("#setTitle")).toHaveText("Настройки");
+    await expect(page.locator("#formSet [name=capKwh]")).toBeVisible();
+    await expect(page.locator("#formSet [name=startOdo]")).toHaveValue("1500");
+  });
+});
+
 test("первый запуск: приветствие и настройка машины", async ({ page }) => {
   await page.goto("./");
   await expect(page.locator("#welcome")).toBeVisible();
@@ -328,7 +365,7 @@ test("страница конфиденциальности: ссылка с г�
   await expect(page.locator("h1")).toHaveText("Конфиденциальность");
   await expect(page.locator("body")).toContainText("хранятся только на вашем устройстве");
   await page.click("a.back");
-  await expect(page.locator("#carName")).toBeVisible();
+  await expect(page.locator("#welcome")).toBeVisible();
 
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload(); // страницей управляет service worker
@@ -411,7 +448,7 @@ test.describe("подсказка для iPhone", () => {
     await page.click("#btnIosHint");
     await expect(hint).toBeHidden();
     await page.reload();
-    await expect(page.locator("#carName")).toBeVisible();
+    await expect(page.locator("#welcome")).toBeVisible();
     await expect(hint).toBeHidden();
   });
 
@@ -424,14 +461,14 @@ test.describe("подсказка для iPhone", () => {
   test("в приложении с иконки подсказки нет", async ({ page }) => {
     await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { get: () => true }));
     await page.goto("./");
-    await expect(page.locator("#carName")).toBeVisible();
+    await expect(page.locator("#welcome")).toBeVisible();
     await expect(page.locator("#iosHint")).toBeHidden();
   });
 });
 
 test("на Android подсказки для iPhone нет", async ({ page }) => {
   await page.goto("./");
-  await expect(page.locator("#carName")).toBeVisible();
+  await expect(page.locator("#welcome")).toBeVisible();
   await expect(page.locator("#iosHint")).toBeHidden();
 });
 
@@ -1010,17 +1047,18 @@ test.describe("режим гибрида с розеткой", () => {
 
   test("настройка: «Гибрид с розеткой» прячет поля электромобиля и сохраняется", async ({ page }) => {
     await page.goto("./");
-    await page.click("#btnStart");
+    await page.click("#btnStart");                               // первая настройка — короткая: ёмкость и расход потом
     const set = page.locator("#dlgSet");
-    await expect(set.locator("[name=capKwh]")).toBeVisible();
+    await expect(set.locator("[name=startRange]")).toBeVisible();
     await page.click("#ptSeg [data-p=phev]");
-    for (const n of ["startRange", "carCons", "capKwh"]) await expect(set.locator(`[name=${n}]`)).toBeHidden();
-    await expect(set).toContainText("зарядили и заправили");
+    await expect(set.locator("[name=startRange]")).toBeHidden();
     await page.fill("#formSet [name=startOdo]", "1000");
     await page.click("#formSet button[type=submit]");
     expect((await docs(page))["meta/settings"].powertrain).toBe("phev");
-    await page.click("#btnSettings");
+    await page.click("#btnSettings");                            // полные настройки
     await expect(page.locator("#ptSeg [data-p=phev]")).toHaveAttribute("aria-pressed", "true");
+    for (const n of ["startRange", "carCons", "capKwh"]) await expect(set.locator(`[name=${n}]`)).toBeHidden();
+    await expect(set.getByText("зарядили и заправили")).toBeVisible();
     await page.click("#ptSeg [data-p=ev]");
     await expect(set.locator("[name=capKwh]")).toBeVisible();
   });
