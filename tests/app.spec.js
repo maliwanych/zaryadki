@@ -545,6 +545,7 @@ test("зарядки раньше начала учёта не входят в �
   // попробовал приложение неделю назад, а начало учёта поставил на сегодня
   await page.goto("./");
   await page.click("#btnAdd");
+  await page.click("#btnWhen");                              // дата — строкой «Сегодня, …», поле по «Изменить»
   await page.fill("#formSess [name=ts]", "2026-01-05T12:00");
   await page.fill("#formSess [name=kwh]", "40");
   await page.fill("#formSess [name=byn]", "30");
@@ -681,8 +682,7 @@ test("свой список станций: появляется у поля, ф
   await page.click("#btnAdd");
   const input = page.locator("#formSess [name=station]");
   expect(await input.getAttribute("list")).toBeNull();
-  await expect(page.locator("#stationSug")).toBeHidden();
-  await input.focus();
+  await expect(input).toBeFocused();                                   // форма начинается со станции — список сразу под рукой
   const items = page.locator("#stationSug button");
   await expect(items.first()).toContainText("Работа");               // последняя по времени — наверху
   expect(await items.count()).toBe(4);                                 // все станции, кроме сбойной
@@ -1378,6 +1378,64 @@ test.describe("дизайн-ревью: подписи, тёмная тема, �
     await page.goto("./");
     await expect(page.locator("#toast")).toHaveAttribute("role", "status");
     await expect(page.locator("#toast")).toHaveAttribute("aria-live", "polite");
+  });
+});
+
+test.describe("форма зарядки: у станции — одной рукой", () => {
+  // ревью: курсор вставал на уже заполненную дату, кВт·ч и сумма — в третьем ряду, тип не следовал за станцией
+  test("порядок: станция → кВт·ч → сумма → тип; курсор на станции; дата строкой, поле — по «Изменить»", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnAdd");
+    await expect(page.locator("#formSess [name=station]")).toBeFocused();
+    const y = async sel => (await page.locator(sel).boundingBox()).y;
+    const order = [await y("#formSess [name=station]"), await y("#formSess [name=kwh]"), await y("#typeSeg"), await y("#whenRow")];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(await y("#formSess [name=byn]")).toBe(await y("#formSess [name=kwh]"));    // сумма — рядом с кВт·ч
+    await expect(page.locator("#whenText")).toHaveText(/^Сегодня, \d\d:\d\d$/);
+    await expect(page.locator("#whenField")).toBeHidden();
+    await page.click("#btnWhen");
+    await expect(page.locator("#formSess [name=ts]")).toBeVisible();
+    await page.fill("#formSess [name=ts]", "2026-08-05T09:30");
+    await page.fill("#formSess [name=kwh]", "10");
+    await page.fill("#formSess [name=byn]", "5");
+    await page.click("#btnSaveSess");
+    const ts = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem("ev-tracker")).docs).map(d => d.ts));
+    expect(ts).toContain("2026-08-05T09:30");
+  });
+
+  test("тип подставляется по станции, пока его не выбрали руками", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnAdd");
+    await expect(page.locator("#typeSeg [data-t=ac]")).toHaveAttribute("aria-pressed", "true");   // как в прошлый раз
+    await page.locator("#stationSug button", { hasText: "Трасса Б" }).click();                   // там заряжались на трассе
+    await expect(page.locator("#typeSeg [data-t=hwy]")).toHaveAttribute("aria-pressed", "true");
+    await page.click("#typeSeg [data-t=ac]");                                                    // выбрали руками
+    await page.fill("#formSess [name=station]", "Станция А");                                    // там был DC
+    await expect(page.locator("#typeSeg [data-t=ac]")).toHaveAttribute("aria-pressed", "true");  // ручной выбор не сбивается
+  });
+
+  test("«Для точного расхода» свёрнуто, открытое — запоминается; у правки с пробегом — раскрыто", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnAdd");
+    await expect(page.locator("#exactBox")).not.toHaveAttribute("open", "");
+    await expect(page.locator("#formSess [name=odo]")).toBeHidden();
+    await page.click("#exactBox summary");
+    await expect(page.locator("#formSess [name=odo]")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.click("#btnAdd");
+    await expect(page.locator("#exactBox")).toHaveAttribute("open", "");                      // открыл однажды — открыто и дальше
+    await page.click("#exactBox summary");
+    await page.keyboard.press("Escape");
+    await page.click("#tabs [data-tab=sessions]");
+    await page.locator("#list .sess", { hasText: "Работа" }).first().click();                  // у этой зарядки есть пробег
+    await expect(page.locator("#formSess [name=odo]")).toBeVisible();
+    await expect(page.locator("#formSess [name=station]")).not.toBeFocused();                  // правка — без клавиатуры поверх
+    await expect(page.locator("#formSess [name=kwhBat]")).toHaveValue("37,6");                // запятая, как в остальных полях
+    const box = await page.locator("#exactBox").boundingBox(), odo = await page.locator("#formSess [name=odo]").boundingBox();
+    expect(odo.x + odo.width).toBeLessThanOrEqual(box.x + box.width + 0.5);                    // поля не вылезают за край
   });
 });
 
