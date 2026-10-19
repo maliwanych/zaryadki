@@ -84,6 +84,10 @@ section{margin-top:28px}
 
 .odo-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .odo-row b{font-size:20px;font-weight:600}
+#remDue{margin-top:10px;border-top:1px solid var(--line)}
+.tabs button{position:relative}
+.tabs button.due::after{content:"";position:absolute;top:8px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--red)}
+@media (max-width:380px){.tabs button{font-size:13px}}   /* «Напоминания» and its dot fit a 360 px screen */
 .link-btn{background:none;border:0;color:var(--ac);font-weight:500;padding:6px 0;min-height:44px;min-width:44px}
 
 /* Types */
@@ -314,6 +318,7 @@ body.fresh .top,body.fresh #tabs,body.fresh .tabbed:not(.ver),body.fresh main>se
         <div><div class="muted" style="font-size:13px">Пробег и запас хода</div><b id="odoNow">—</b></div>
         <button class="link-btn" id="btnOdo">Обновить</button>
       </div>
+      <div id="remDue" hidden></div>
       <p class="mnote" id="odoStale"></p>
     </div>
   </section>
@@ -609,7 +614,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.24";
+const APP_VERSION = "1.0.25";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1050,7 +1055,11 @@ function renderCosts(st){
 function curOdo(){ return readings().reduce((m,x)=>Math.max(m,x.odo||0),0); }
 function renderReminders(){
   const el=$("remList"); el.innerHTML=""; const odo=curOdo(); const today=new Date();
-  if(!S.reminders.length){ el.innerHTML='<span class="muted">Например, перестановка шин каждые 10 000 км</span>'; return; }
+  const due=$("remDue"), tabRem=$("tabs").querySelector("[data-tab=rem]"); due.innerHTML="";
+  let nDue=0;
+  const done=()=>{ due.hidden=!nDue; tabRem.classList.toggle("due",!!nDue);
+    if(nDue) tabRem.setAttribute("aria-label",`Напоминания: подошёл срок (${nDue})`); else tabRem.removeAttribute("aria-label"); };
+  if(!S.reminders.length){ el.innerHTML='<span class="muted">Например, перестановка шин каждые 10 000 км</span>'; done(); return; }
   const rows=S.reminders.map(r=>{
     let kmLeft=null, daysLeft=null;
     if(r.everyKm) kmLeft=(r.lastOdo||0)+r.everyKm-odo;
@@ -1073,7 +1082,10 @@ function renderReminders(){
     b.innerHTML=`<span class="l"><b></b><small>${sub.join(" · ")}</small></span><span class="r"><b>${parts[0]||"—"}</b>${parts[1]?`<small>${parts[1]}</small>`:""}</span>`;
     b.querySelector("b").textContent=r.title;
     b.addEventListener("click",()=>openRem(r)); el.appendChild(b);
+    // maintenance that is due shows up on «Обзор» too, under the mileage it depends on (up to two rows)
+    if(warn && ++nDue<=2){ const c=b.cloneNode(true); c.addEventListener("click",()=>openRem(r)); due.appendChild(c); }
   });
+  done();
 }
 
 /* ---------- monthly ---------- */

@@ -257,6 +257,32 @@ test("правка записи не стирает поля, которых н�
 const importJson = (page, data) =>
   page.setInputFiles("#fileImport", { name: "copy.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(data)) });
 
+test("подошедшее ТО — на «Обзоре» под пробегом и точкой на вкладке; нажатие открывает напоминание", async ({ page }) => {
+  // ревью: напоминания жили только на 4-й вкладке, просроченное ТО было не видно
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Т", purchaseDate: "2026-08-01", startOdo: 9800 }, sessions: [],
+    reminders: [{ id: "r1", title: "Перестановка шин", everyKm: 10000, lastOdo: 0 }, { id: "r2", title: "Страховка", dueDate: "2027-09-01", everyMonths: 12 }] });
+  const due = page.locator("#remDue");
+  await expect(due).toBeVisible();
+  await expect(due).toContainText("Перестановка шин");
+  await expect(due).toContainText(/через 200 км/);
+  await expect(due).not.toContainText("Страховка");               // далеко — не мозолит глаза
+  await expect(page.locator("#tabs [data-tab=rem]")).toHaveClass(/due/);
+  await expect(page.locator("#tabs [data-tab=rem]")).toHaveAttribute("aria-label", /подошёл срок/);
+  await due.locator(".rowline").click();
+  await expect(page.locator("#dlgRem")).toBeVisible();
+  await expect(page.locator("#formRem [name=title]")).toHaveValue("Перестановка шин");
+});
+
+test("когда сроки далеко, на «Обзоре» напоминаний нет и точки на вкладке нет", async ({ page }) => {
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Т", purchaseDate: "2026-08-01", startOdo: 1000 }, sessions: [],
+    reminders: [{ id: "r1", title: "Перестановка шин", everyKm: 10000, lastOdo: 0 }] });
+  await expect(page.locator("#odoNow")).toContainText(/1\s000/);
+  await expect(page.locator("#remDue")).toBeHidden();
+  await expect(page.locator("#tabs [data-tab=rem]")).not.toHaveClass(/due/);
+});
+
 test("цена км не уходит в минус сразу после покупки", async ({ page }) => {
   // Отдали с запасом 300 км, проехали 10, запас 250: «оплачено» 10 + 250 − 300 = −40 км
   await page.goto("./");
