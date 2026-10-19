@@ -28,6 +28,7 @@ self.addEventListener("fetch", e => {
   if (url.origin !== location.origin) return;
   // App files: from the cache first, so the app opens instantly and offline
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).catch(() => caches.match("index.html")))
+    // offline and not cached: a page opens the app, a file fails as it should (no HTML pretending to be an image or a font)
+    caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).catch(err => req.mode === "navigate" ? caches.match("index.html") : Promise.reject(err)))
   );
 });

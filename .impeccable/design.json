@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-19T08:31:48Z",
+  "generatedAt": "2026-10-19T08:57:41Z",
   "title": "Design System: Зарядки",
   "extensions": {
     "colorMeta": {
@@ -400,10 +400,6 @@
       "label": {
         "displayName": "Label",
         "purpose": "Подписи под цифрами и полями, мета-строки."
-      },
-      "display-small": {
-        "displayName": "Display Small",
-        "purpose": "Малый счётчик."
       },
       "display-separator": {
         "displayName": "Display Separator",
