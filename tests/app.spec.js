@@ -1218,6 +1218,52 @@ test.describe("удаление всех данных", () => {
     expect(Object.keys(await stored(page)).filter(k => k.startsWith("sessions/"))).toHaveLength(backup.sessions.length);
   });
 
+  test("удалённое можно вернуть сутки — и после перезапуска, потом копия стирается", async ({ page }) => {
+    // ревью: копия для «Вернуть как было» лежала бессрочно и возвращалась из настроек любым, кому достался телефон
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnSettings");
+    await page.click("#btnWipe");
+    await page.click("#btnWipeOk");
+    await page.click("#btnWipeOk");
+    await expect(page.locator("#welcome")).toBeVisible();
+    await page.reload();                                                   // в течение суток — вернуть можно и после перезапуска
+    await expect(page.locator("#undoBanner")).toBeVisible();
+    await expect(page.locator("#undoText")).toHaveText("Данные удалены");
+    await page.evaluate(() => { const u = JSON.parse(localStorage.getItem("ev-tracker-undo")); u.at = new Date(Date.now() - 25 * 3600e3).toISOString(); localStorage.setItem("ev-tracker-undo", JSON.stringify(u)); });
+    await page.reload();                                                   // сутки прошли
+    await expect(page.locator("#welcome")).toBeVisible();
+    await expect(page.locator("#undoBanner")).toBeHidden();
+    expect(await page.evaluate(() => localStorage.getItem("ev-tracker-undo"))).toBeNull();
+  });
+
+  test("после удаления внесли новое — плашка «Вернуть как было» уходит, чтобы не затереть новое", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await page.click("#btnSettings");
+    await page.click("#btnWipe");
+    await page.click("#btnWipeOk");
+    await page.click("#btnWipeOk");
+    await page.reload();
+    await expect(page.locator("#undoBanner")).toBeVisible();
+    await page.click("#btnAdd");
+    await page.fill("#formSess [name=kwh]", "20");
+    await page.fill("#formSess [name=byn]", "10");
+    await page.click("#btnSaveSess");
+    await expect(page.locator("#undoBanner")).toBeHidden();
+  });
+
+  test("копия перед загрузкой файла по времени не стирается", async ({ page }) => {
+    await page.goto("./");
+    await importBackup(page);
+    await importBackup(page);                                              // поверх данных — с окном замены
+    await page.click("#btnImportOk");
+    await page.evaluate(() => { const u = JSON.parse(localStorage.getItem("ev-tracker-undo")); u.at = new Date(Date.now() - 30 * 864e5).toISOString(); localStorage.setItem("ev-tracker-undo", JSON.stringify(u)); });
+    await page.reload();
+    await page.click("#btnSettings");
+    await expect(page.locator("#btnUndoImport")).toBeVisible();
+  });
+
   test("на пустом телефоне и в примере кнопки нет", async ({ page }) => {
     await page.goto("./");
     await page.click("#btnStart");

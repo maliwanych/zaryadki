@@ -563,7 +563,7 @@ body.fresh .top,body.fresh #tabs,body.fresh .tabbed:not(.ver),body.fresh main>se
 <dialog id="dlgWipe"><form class="sheet" id="formWipe" method="dialog">
   <h2>Удалить все данные?</h2>
   <p class="imp" id="wipeWhat"></p>
-  <p class="imp">Удалятся все записи и настройки на этом телефоне — приложение станет как новое. Если передумаете, сразу нажмите «Вернуть как было» (или в настройках, пока не загрузите другой файл).</p>
+  <p class="imp">Удалятся все записи и настройки на этом телефоне — приложение станет как новое. Если передумаете, нажмите «Вернуть как было» — это можно сделать в течение суток.</p>
   <p class="hint">Надёжнее сначала сохранить резервную копию.</p>
   <button type="button" class="btn" id="btnWipeBackup" style="width:100%;margin-top:6px">Сохранить резервную копию</button>
   <div class="sheet-actions">
@@ -617,7 +617,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.26";
+const APP_VERSION = "1.0.27";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -802,7 +802,12 @@ function render(){
   $("sinceWrap").hidden = S.configured===false;   // no start date before it is set
   document.title = S.settings.carName ? `Зарядки · ${S.settings.carName}` : "Учёт зарядок";
   $("welcome").hidden = S.configured!==false || DEMO;
-  document.body.classList.toggle("fresh", S.configured===false && !DEMO && !(S.sessions.length||S.fuel.length||S.costs.length||S.reminders.length||S.odoLog.length));
+  const fresh=S.configured===false && !DEMO && !(S.sessions.length||S.fuel.length||S.costs.length||S.reminders.length||S.odoLog.length);
+  document.body.classList.toggle("fresh", fresh);
+  // everything deleted, the day to change one's mind isn't over: «Вернуть как было» stays in sight (the short setup hides «Данные»)
+  const ub=$("undoBanner");
+  if(fresh && readUndo()){ clearTimeout(offerUndo._t); $("undoText").textContent="Данные удалены"; ub.hidden=false; ub.dataset.fresh="1"; }
+  else if(ub.dataset.fresh){ ub.hidden=true; delete ub.dataset.fresh; }   // new records after the wipe: «Вернуть» would overwrite them
   backupNag();
   iosHint();
 
@@ -1670,9 +1675,10 @@ const countText=(counts,none="нет записей")=>Object.keys(COUNT_WORDS).
 
 /* ---------- undo the last import: the replaced data is kept on this phone until the next import ---------- */
 const UNDO_KEY=DB_KEY+"-undo";
-function rememberUndo(keep){
+const WIPE_UNDO_MS=864e5;   // «Удалить все данные» means deleted: the copy for «Вернуть как было» lives a day, then it is erased
+function rememberUndo(keep,wipe){
   try{ const before=localStorage.getItem(DB_KEY);
-    if(keep&&before) localStorage.setItem(UNDO_KEY, JSON.stringify({at:new Date().toISOString(), data:before}));
+    if(keep&&before) localStorage.setItem(UNDO_KEY, JSON.stringify({at:new Date().toISOString(), data:before, ...(wipe?{wipe:true}:{})}));
     else localStorage.removeItem(UNDO_KEY);
   }catch(e){ try{ localStorage.removeItem(UNDO_KEY); }catch(_){} }   // no room for the undo copy: an older one must not stay behind
 }
@@ -1687,7 +1693,10 @@ function applyImport(docs,done,keepUndo){
   catch(err){ toast("Не получилось сохранить — не хватает места"); return; }
   if(keepUndo) offerUndo("Копия загружена");
 }
-function readUndo(){ if(DEMO) return null; try{ const u=JSON.parse(localStorage.getItem(UNDO_KEY)||"null"); return u&&u.data?u:null; }catch(e){ return null; } }
+function readUndo(){ if(DEMO) return null;
+  try{ const u=JSON.parse(localStorage.getItem(UNDO_KEY)||"null"); if(!u||!u.data) return null;
+    if(u.wipe && !(Date.now()-new Date(u.at)<WIPE_UNDO_MS)){ localStorage.removeItem(UNDO_KEY); return null; }   // the deleted data's day is over
+    return u; }catch(e){ return null; } }
 async function undoImport(){
   const u=readUndo(); if(!u) return;
   db.replaceAll(JSON.parse(u.data).docs||{});   // throws on a full storage → the caller shows a toast
@@ -1961,7 +1970,7 @@ $("btnWipe").addEventListener("click",()=>{
 $("btnWipeBackup").addEventListener("click",()=>$("btnJson").click());
 armConfirm($("btnWipeOk"), async()=>{
   if(DEMO) return;
-  rememberUndo(true);
+  rememberUndo(true,true);
   db.replaceAll({});
   $("dlgWipe").close(); setTab("overview");
   toast("Все данные удалены");
