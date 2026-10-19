@@ -167,7 +167,8 @@ label.check small{font-size:12px;color:var(--muted)}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px}
 .top h1{margin:0}
 .top .link-btn{flex:none}
-.set-h{font-size:15px;font-weight:600;margin:22px 0 4px}
+.set-h{font-size:15px;font-weight:600;margin:0 0 4px}
+.set-data-block{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
 .set-data{display:grid;gap:8px;margin:10px 0 8px}
 
 .fab{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--plate) 70%,transparent);display:flex;justify-content:center;z-index:5}
@@ -464,31 +465,33 @@ body.fresh .top,body.fresh #tabs,body.fresh .tabbed:not(.ver),body.fresh main>se
     <label class="full">Машина<input name="carName" placeholder="Например, Geely EX5" autocomplete="off"></label>
     <label>Начало учёта<input type="date" name="purchaseDate" required></label>
     <label>Пробег в начале учёта, км<input name="startOdo" inputmode="numeric" required placeholder="С одометра"></label>
+    <p class="hint full ev-only adv">День, с которого записываете все зарядки. Пробег и запас хода — на этот день, с панели.</p>
+    <p class="hint full phev-only adv" hidden>День, с которого записываете все зарядки и заправки. Запас хода и ёмкость гибриду не нужны.</p>
     <label class="ev-only">Запас хода в начале учёта, км<input name="startRange" inputmode="numeric" placeholder="Неизвестно"></label>
     <label>Валюта<select name="currency"><option value="BYN">BYN</option><option value="RUB">₽ (RUB)</option></select></label>
-    <p class="hint full adv">Смена валюты меняет только подпись — суммы не пересчитываются.</p>
+    <p class="hint full adv">Меняется только подпись, суммы не пересчитываются.</p>
     <label class="full ev-only adv">Расход по бортовому компьютеру, кВт·ч/100 км<input name="carCons" inputmode="decimal" placeholder="Например, 15,0"></label>
     <label class="full ev-only adv">Полезная ёмкость батареи, кВт·ч<input name="capKwh" inputmode="decimal" placeholder="Из характеристик"></label>
-    <p class="hint full phev-only adv" hidden>Начало учёта — день, с которого вы записываете все зарядки и заправки. Для гибрида запас хода и ёмкость не нужны: считаем только по тому, что вы зарядили и заправили и сколько заплатили.</p>
-    <p class="hint full ev-only adv">Начало учёта — день, с которого вы записываете все зарядки: сегодня или, если вели записи с покупки, дата покупки. Пробег и запас хода — в этот день, с панели. Без запаса стоимость километра покажется диапазоном.</p>
-    <p class="hint full ev-only adv">Полезная ёмкость — часть батареи, которой машина реально пользуется; она немного меньше полной. Ищите в характеристиках «полезная», «нетто» или «usable». Если нашли только полную — укажите её, запас хода выйдет чуть завышенным. Нужна для расчёта реального запаса хода.</p>
+    <p class="hint full ev-only adv">В характеристиках — «полезная», «нетто» или «usable». Нужна для реального запаса хода.</p>
     <div class="full adv"><label style="margin-bottom:4px">Тема</label>
       <div class="seg" id="themeSeg"><button type="button" data-th="">Как в телефоне</button><button type="button" data-th="light">Светлая</button><button type="button" data-th="dark">Тёмная</button></div>
     </div>
   </div>
-  <h3 class="set-h adv">Данные</h3>
-  <p class="hint adv">Всё хранится только на этом телефоне. С резервной копией данные можно вернуть или перенести на другой телефон.</p>
-  <div class="set-data adv">
-    <button type="button" class="btn" id="btnJson" hidden>Сохранить резервную копию</button>
-    <button type="button" class="btn" id="btnXlsx" hidden>Выгрузить в Excel</button>
-    <button type="button" class="btn" id="btnImport">Загрузить файл</button>
-  </div>
-  <p class="hint adv">Резервная копия (.json) заменит данные, таблица Excel или CSV — добавит зарядки к ним.</p>
-  <button type="button" class="btn adv" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
-  <button type="button" class="btn wipe-link adv" id="btnWipe" hidden>Удалить все данные</button>
   <div class="sheet-actions">
     <button type="button" class="btn" data-close>Отмена</button>
     <button type="submit" class="btn primary">Сохранить</button>
+  </div>
+  <!-- below the form's own buttons: these act at once, the layout says it (no caption) -->
+  <div class="set-data-block adv">
+    <h3 class="set-h">Данные</h3>
+    <div class="set-data">
+      <button type="button" class="btn" id="btnJson" hidden>Сохранить резервную копию</button>
+      <button type="button" class="btn" id="btnXlsx" hidden>Выгрузить в Excel</button>
+      <button type="button" class="btn" id="btnImport">Загрузить файл</button>
+    </div>
+    <p class="hint">Копия (.json) заменит данные, таблица Excel или CSV — добавит зарядки.</p>
+    <button type="button" class="btn" id="btnUndoImport" data-armed-label="Точно вернуть? Изменения после этого пропадут" hidden style="width:100%;margin-top:14px"></button>
+    <button type="button" class="btn wipe-link" id="btnWipe" hidden>Удалить все данные</button>
   </div>
 </form></dialog>
 
@@ -614,7 +617,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.25";
+const APP_VERSION = "1.0.26";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
