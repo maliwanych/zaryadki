@@ -1,6 +1,6 @@
 // Service worker: makes the app open without internet and delivers updates.
 // To ship an update, change VERSION — phones will offer "Доступна новая версия".
-const VERSION = "1.0.27";
+const VERSION = "1.0.28";
 const CACHE = "zaryadki-" + VERSION;
 const SHELL = ["./", "index.html", "privacy.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png",
   "fonts/onest-cyrillic.woff2", "fonts/onest-latin.woff2", "fonts/onest-latin-ext.woff2"];
@@ -28,6 +28,7 @@ self.addEventListener("fetch", e => {
   if (url.origin !== location.origin) return;
   // App files: from the cache first, so the app opens instantly and offline
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).catch(() => caches.match("index.html")))
+    // offline and not cached: a page opens the app, a file fails as it should (no HTML pretending to be an image or a font)
+    caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).catch(err => req.mode === "navigate" ? caches.match("index.html") : Promise.reject(err)))
   );
 });

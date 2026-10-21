@@ -59,16 +59,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .register-wrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 16px 16px}
 .reg-label{font-size:14px;color:var(--muted);margin-bottom:8px}
 .register{display:flex;gap:3px;align-items:stretch;--h:52px;font-size:38px;font-weight:600}
-.register.small{--h:34px;font-size:23px;gap:2px}
 .drum{width:calc(var(--h)*.66);height:var(--h);overflow:hidden;background:var(--drum);color:var(--drum-ink);border-radius:4px;position:relative;box-shadow:inset 0 6px 8px -6px rgba(0,0,0,.8),inset 0 -6px 8px -6px rgba(0,0,0,.8)}
 .drum.dec{background:var(--red);color:#fff}
 .strip{display:flex;flex-direction:column;transition:transform 1.1s cubic-bezier(.2,.8,.2,1)}
 .strip span{height:var(--h);display:flex;align-items:center;justify-content:center;line-height:1}
 .reg-sep{width:6px;display:flex;align-items:flex-end;justify-content:center;font-size:28px;line-height:1;padding-bottom:4px;color:var(--muted)}
-.register.small .reg-sep{font-size:20px;padding-bottom:2px}
 .reg-unit{align-self:flex-end;font-size:15px;font-weight:500;color:var(--muted);margin-left:8px;padding-bottom:4px}
 .reg-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 0}
-.reg2{margin-top:14px}
 @media (prefers-reduced-motion:reduce){.strip{transition:none}}
 
 /* Figures */
@@ -218,8 +215,6 @@ input,select{font:inherit;font-size:17px;color:var(--ink);background:var(--field
 .regsub small{display:block;font-size:13px;color:var(--muted)}
 .regsub b{display:block;font-size:20px;font-weight:600;line-height:1.25}
 .regsub span{display:block;font-size:12px;color:var(--muted)}
-.ref{width:100%;display:flex;justify-content:space-between;gap:10px;background:none;border:0;padding:6px 0;font-size:14px;color:var(--muted);text-align:left}
-.ref span:last-child{color:var(--ink);font-weight:500;white-space:nowrap}
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:4;display:grid;grid-template-columns:repeat(4,1fr);background:var(--plate);border-bottom:1px solid var(--line);margin:0 -16px 18px;padding:0 16px}
 .tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:12px 2px;font-size:14px;color:var(--muted)}
 .tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
@@ -595,8 +590,8 @@ body.fresh .top,body.fresh #tabs,body.fresh .tabbed:not(.ver),body.fresh main>se
 function localDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 // same day n months later; 31 Jan + 1 month = end of February, not 3 March
 function addMonths(d,n){ const x=new Date(d.getFullYear(), d.getMonth()+n, 1); x.setDate(Math.min(d.getDate(), new Date(x.getFullYear(), x.getMonth()+1, 0).getDate())); return x; }
-const TYPES = {ac:{name:"AC, медленная",cls:"t-ac",var:"--ac"}, dc:{name:"DC в городе",cls:"t-dc",var:"--dc"}, hwy:{name:"DC на трассе",cls:"t-hwy",var:"--hwy"}};
-const S = {sessions:[], settings:{purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], fuel:[], loaded:{s:false,set:false,cur:false}};
+const TYPES = {ac:{name:"AC, медленная",cls:"t-ac"}, dc:{name:"DC в городе",cls:"t-dc"}, hwy:{name:"DC на трассе",cls:"t-hwy"}};
+const S = {sessions:[], settings:{purchaseDate:localDate(new Date()), startOdo:0, startRange:null, carName:""}, current:null, refunds:[], odoLog:[], costs:[], reminders:[], fuel:[]};
 let lastTotal = 0, db = null, downloads = null, editingId = null, editingCost = null, editingRem = null, bynTouched = false, curType = "dc", firstPaint = true;
 
 const $ = id => document.getElementById(id);
@@ -605,7 +600,6 @@ const fmt = (n,d=2) => n.toLocaleString("ru-RU",{minimumFractionDigits:d,maximum
 const fmtInt = n => Math.round(n).toLocaleString("ru-RU");
 const pad = n => String(n).padStart(2,"0");
 const nowLocal = () => { const d=new Date(); return `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const cssv = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const curCode = c => Object.prototype.hasOwnProperty.call(CURRENCIES,c) ? c : "BYN";
 const cur = () => CURRENCIES[curCode(S.settings.currency)];
 const HYB = () => S.settings.powertrain==="phev";   // plug-in hybrid (EM-i, EM-R): charges and fill-ups, no car readings
@@ -617,7 +611,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.27";
+const APP_VERSION = "1.0.28";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -626,10 +620,14 @@ const DEMO = (()=>{ try{ return sessionStorage.getItem(DEMO_KEY)==="1" && localS
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
 function LocalDB(key){
-  const load=()=>{ try{ const o=JSON.parse(localStorage.getItem(key)||"null"); return (o&&o.docs)||{}; }catch(e){ return {}; } };
+  let raw=null;   // the stored text as last read or written: tells whether another window wrote since
+  const load=()=>{ try{ raw=localStorage.getItem(key); const o=JSON.parse(raw||"null"); return (o&&o.docs)||{}; }catch(e){ return {}; } };
   let docs=load();
   const subs=new Set();
-  const save=()=>localStorage.setItem(key, JSON.stringify({schema:1, docs}));   // throws on quota → caller shows a toast
+  const save=()=>{ const s=JSON.stringify({schema:1, docs}); localStorage.setItem(key, s); raw=s; };   // throws on quota → caller shows a toast
+  // a browser tab next to the installed app share this storage; one that slept in the background may hold old data.
+  // So every write starts from what is stored now and changes only its own records — never an old copy over a newer one
+  const fresh=()=>{ docs=load(); };
   const notify=()=>subs.forEach(f=>f());   // in the order of subscription
   const snap=p=>{ const d=docs[p]; return {id:p.split("/").pop(), exists:d!==undefined, data:()=>d}; };
   const depth=p=>p.split("/").length;
@@ -638,16 +636,20 @@ function LocalDB(key){
   const sub=f=>{ subs.add(f); f(); return ()=>subs.delete(f); };
   const doc=p=>({ id:p.split("/").pop(), path:p,
     get:async()=>snap(p),
-    set:async d=>{ const prev=docs[p]; docs[p]=JSON.parse(JSON.stringify(d)); try{ save(); }catch(e){ if(prev===undefined) delete docs[p]; else docs[p]=prev; throw e; } notify(); },
-    delete:async()=>{ const prev=docs[p]; delete docs[p]; try{ save(); }catch(e){ docs[p]=prev; throw e; } notify(); },
+    set:async d=>{ fresh(); const prev=docs[p]; docs[p]=JSON.parse(JSON.stringify(d)); try{ save(); }catch(e){ if(prev===undefined) delete docs[p]; else docs[p]=prev; throw e; } notify(); },
+    delete:async()=>{ fresh(); const prev=docs[p]; delete docs[p]; try{ save(); }catch(e){ docs[p]=prev; throw e; } notify(); },
     onSnapshot:(n)=>sub(()=>n(snap(p))) });
   const collection=c=>({ path:c, doc:id=>doc(`${c}/${id||LocalDB.newId()}`), onSnapshot:(n)=>sub(()=>{ const d=colDocs(c); n({docs:d,size:d.length,empty:!d.length}); }) });
   // another tab or window changed the data
   window.addEventListener("storage",e=>{ if(e.key===key){ docs=load(); notify(); } });
+  // back on screen (from another app or tab, or restored by «назад»): a sleeping window may have missed that event
+  const reread=()=>{ let r; try{ r=localStorage.getItem(key); }catch(e){ return; } if(r!==raw){ docs=load(); notify(); } };
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") reread(); });
+  window.addEventListener("pageshow",e=>{ if(e.persisted) reread(); });
   // after every change, once — subscribed last, it runs after all onSnapshot handlers have read the new data
   const onChange=f=>sub(f);
   return { doc, collection, onChange, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); },
-    setMany:(pairs)=>{ const prev={...docs}; pairs.forEach(([p,d])=>{ docs[p]=JSON.parse(JSON.stringify(d)); }); try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
+    setMany:(pairs)=>{ fresh(); const prev={...docs}; pairs.forEach(([p,d])=>{ docs[p]=JSON.parse(JSON.stringify(d)); }); try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
 }
 LocalDB.newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
@@ -935,7 +937,7 @@ function renderList(ss){
   if(hyb) $("listPills").innerHTML=[["all","Все"],["charge","Зарядки"],["fuel","Заправки"]].map(([k,l])=>`<button type="button" data-f="${k}" aria-pressed="${k===listFilter}">${l}</button>`).join("");
   const showS=!hyb||listFilter!=="fuel", showF=hyb&&listFilter!=="charge";
   const items=[...(showS?ss.map(x=>({fuel:false,ts:x.ts,x})):[]), ...(showF?S.fuel.map(x=>({fuel:true,ts:x.ts,x})):[])].sort((a,b)=>a.ts<b.ts?1:-1);
-  if(!items.length){ el.innerHTML=hyb?'<p class="muted">Записей пока нет.</p>':'<p class="muted">Зарядок пока нет. Нажмите «Добавить зарядку», когда будете у станции.</p>'; return; }
+  if(!items.length){ el.innerHTML=hyb?'<p class="muted">Записей пока нет.</p>':'<p class="muted">Зарядок пока нет.</p>'; return; }
   const shown=items.slice(0,listLimit);
   const groups={}; shown.forEach(it=>{ const k=it.ts.slice(0,10); (groups[k]=groups[k]||[]).push(it); });
   Object.keys(groups).forEach(k=>{
@@ -990,10 +992,9 @@ function renderAzs(){
 }
 
 /* ---------- stations ---------- */
-function stationPrice(name){
-  const ss=S.sessions.filter(s=>s.station===name && !glitch(s)).sort((a,b)=>a.ts<b.ts?1:-1);
-  return ss.length ? ss[0].byn/ss[0].kwh : null;
-}
+// the latest real charge at a station: the next one there most likely gets its price and its type
+function lastAtStation(name){ return S.sessions.filter(s=>s.station===name && !glitch(s)).sort((a,b)=>a.ts<b.ts?1:-1)[0]||null; }
+function stationPrice(name){ const s=lastAtStation(name); return s ? s.byn/s.kwh : null; }
 function renderStations(){
   const el=$("stationStats"); const map={};
   S.sessions.filter(s=>!glitch(s)).forEach(s=>{ const k=s.station||"Без названия";
@@ -1054,13 +1055,14 @@ function renderCosts(st){
   if(!S.costs.length) el.innerHTML='<span class="muted">Страховка, шины, ТО, мойки — всё, кроме зарядок</span>';
   const note=$("ownNote");
   if(tot>0 && st.km>0){
-    const chargePer100=st.paid>0?st.pByn/st.paid*100:0, costPer100=acc/st.km*100;
-    note.textContent=`Разовые вложения — ${fmt(invest)} ${cur()}, в стоимость километра не входят. Текущих расходов накоплено ${fmt(acc)} ${cur()}. Владение обходится в ${fmt(chargePer100+costPer100,1)} ${cur()} на 100 км: ${fmt(chargePer100,1)} зарядки плюс ${fmt(costPer100,1)} прочее.`;
+    // a plug-in hybrid pays for charging and fuel: its energy per 100 km is the one on «Обзор» (full tank to full tank, else ≈)
+    const h=st.h, energyPer100=h?(h.per100||0):st.paid>0?st.pByn/st.paid*100:0, costPer100=acc/st.km*100;
+    note.textContent=`Разовые вложения — ${fmt(invest)} ${cur()}, в стоимость километра не входят. Текущих расходов накоплено ${fmt(acc)} ${cur()}. Владение обходится в ${h&&h.approx?"≈":""}${fmt(energyPer100+costPer100,1)} ${cur()} на 100 км: ${fmt(energyPer100,1)} ${h?"зарядки и бензин":"зарядки"} плюс ${fmt(costPer100,1)} прочее.`;
   } else note.textContent="";
 }
 
 /* ---------- reminders ---------- */
-function curOdo(){ return readings().reduce((m,x)=>Math.max(m,x.odo||0),0); }
+function curOdo(){ return RD.reduce((m,x)=>Math.max(m,x.odo||0),0); }   // RD: the readings of the last render (one after every change)
 function renderReminders(){
   const el=$("remList"); el.innerHTML=""; const odo=curOdo(); const today=new Date();
   const due=$("remDue"), tabRem=$("tabs").querySelector("[data-tab=rem]"); due.innerHTML="";
@@ -1124,7 +1126,6 @@ function monthStats(){
     const real=ss.filter(s=>!glitch(s));
     const byn=ss.reduce((a,s)=>a+(s.byn||0),0), kwh=ss.reduce((a,s)=>a+(s.kwh||0),0);
     const rk=real.reduce((a,s)=>a+s.kwh,0), rb=real.reduce((a,s)=>a+s.byn,0);
-    const ref=S.refunds.filter(x=>{ if(!x.date) return y===purchase.getFullYear()&&m===purchase.getMonth(); const t=new Date(x.date+"T12:00"); return t>=start&&t<end; }).reduce((a,x)=>a+(x.byn||0),0);
     const km=Math.max(0,odoAt(r,to)-odoAt(r,from));
     // hybrid: the month's money and what was filled, over the month's distance
     const hPer100=km>50?(byn+fuelByn)/km*100:null, l100=km>50?liters/km*100:null, kwh100=km>50?kwh/km*100:null;
@@ -1142,7 +1143,7 @@ function monthStats(){
     const saved=avg?mix.free*avg:0;
     const partial=end>now;
     const costs=S.costs.reduce((a,c)=>a+costInRange(c,start,to),0);
-    out.push({y,m,byn,kwh,ref,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,avg,partial,costs,saved,fuelByn,liters,nF:fu.length,hPer100,l100,kwh100});
+    out.push({y,m,byn,kwh,km,cons,per100,exact,n:real.length,price:rk?rb/rk:null,mix,avg,partial,costs,saved,fuelByn,liters,nF:fu.length,hPer100,l100,kwh100});
     m++; if(m>11){m=0;y++;}
   }
   return out;
@@ -1241,7 +1242,7 @@ function renderMonths(st){
         <div><b>${M.price!=null?fmt(M.price):"—"}${delta(M.price,P&&P.price,true,2)}</b><small>${cur()} за кВт·ч</small></div>
         <div><b>${fmt(M.costs)} ${cur()}</b><small>прочие расходы</small></div>
         <div><b>${fmt(M.kwh,1)}</b><small>кВт·ч, ${M.n} ${plural(M.n,"зарядка","зарядки","зарядок")}</small></div>
-        ${S.sessions.some(isFree)?`<div><b>${M.saved?`≈${fmt(M.saved,0)} ${cur()}`:"—"}</b><small>сэкономлено на бесплатных</small></div>`:""}
+        ${st.freeKwh>0?`<div><b>${M.saved?`≈${fmt(M.saved,0)} ${cur()}`:"—"}</b><small>сэкономлено на бесплатных</small></div>`:""}
       </div>
       ${mixTot?`<div class="mix"><div class="mixbar">${bar}</div><div class="mixleg">${leg}</div></div>`:""}
       ${notes.length?`<p class="mnote">${notes.join(" ")}</p>`:""}`;
@@ -1259,7 +1260,7 @@ function setType(t){ curType=t; $("typeSeg").querySelectorAll("button").forEach(
 let typeTouched=false;   // chosen by hand in this sheet: the station no longer decides
 $("typeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b){ typeTouched=true; setType(b.dataset.t); } });
 // a station is usually charged the same way: DC in the mall after AC at home isn't silently saved as AC
-function stationType(name){ const s=S.sessions.filter(x=>x.station===name&&!glitch(x)).sort((a,b)=>a.ts<b.ts?1:-1)[0]; return s?s.type:null; }
+function stationType(name){ const s=lastAtStation(name); return s&&TYPES[s.type]?s.type:null; }
 function typeByStation(){ if(typeTouched) return; const t=stationType($("formSess").station.value.trim()); if(t) setType(t); }
 // «Когда»: a line («Сегодня, 01:06»); the field opens on «Изменить»
 function whenLabel(v){
@@ -1291,7 +1292,7 @@ function openSess(s){
   if(s) $("sessTitle").tabIndex=-1; else $("sessTitle").removeAttribute("tabindex");
   $("dlgSess").showModal();
 }
-function lastType(){ const ss=S.sessions.slice().sort((a,b)=>a.ts<b.ts?1:-1); return ss[0]?.type||"dc"; }
+function lastType(){ const ss=S.sessions.slice().sort((a,b)=>a.ts<b.ts?1:-1), t=ss[0]?.type; return TYPES[t]?t:"dc"; }
 let tab="overview";
 const FAB={overview:["Добавить зарядку",()=>openSess(null)], sessions:["Добавить зарядку",()=>openSess(null)],
            costs:["Добавить расход",()=>openCost(null)], rem:["Добавить напоминание",()=>openRem(null)]};
@@ -1347,7 +1348,7 @@ function disarm(btn){ btn.dataset.armed=""; btn.textContent=btn.dataset.label||"
 armConfirm($("btnDel"), async()=>{ if(!editingId||!db) return; await db.collection("sessions").doc(editingId).delete(); $("dlgSess").close(); toast("Зарядка удалена"); });
 
 const ODO_HINT_EV=$("odoHint").textContent, ODO_HINT_HYB="Пробег нужен, чтобы посчитать стоимость километра и напоминания по пробегу.";
-$("btnOdo").addEventListener("click",()=>{ const f=$("formOdo"); f.odo.value=curOdo()||""; f.range.value=""; $("odoRangeL").hidden=HYB(); $("odoHint").textContent=HYB()?ODO_HINT_HYB:ODO_HINT_EV; $("dlgOdo").showModal(); f.range.focus(); });
+$("btnOdo").addEventListener("click",()=>{ const f=$("formOdo"); f.odo.value=curOdo()||""; f.range.value=""; $("odoRangeL").hidden=HYB(); $("odoHint").textContent=HYB()?ODO_HINT_HYB:ODO_HINT_EV; $("dlgOdo").showModal(); (HYB()?f.odo:f.range).focus(); });
 $("formOdo").addEventListener("submit",async e=>{
   e.preventDefault(); if(!db) return; const f=e.target; const odo=num(f.odo.value);
   if(odo===null){ toast("Укажите пробег"); return; }
@@ -1641,7 +1642,7 @@ $("fileImport").addEventListener("change",async e=>{
       let id=r.id; if((typeof id!=="string"&&typeof id!=="number")||String(id).includes("/")||docs[`${c}/${id}`]) id=LocalDB.newId();
       docs[`${c}/${id}`]=d; n++; });
     return n; };
-  const nSess=put("sessions",data.sessions,["kwh","byn","odo","socTo","kwhBat","socFrom"],s=>validTs(s.ts)?{...s,kwh:s.kwh??0,byn:s.byn??0}:null);
+  const nSess=put("sessions",data.sessions,["kwh","byn","odo","socTo","kwhBat","socFrom"],s=>validTs(s.ts)?{...s,kwh:s.kwh??0,byn:s.byn??0,type:TYPES[s.type]?s.type:"dc"}:null);
   put("fuel",data.fuel,["liters","byn","odo"],f=>validTs(f.ts)?{...f,liters:f.liters??0,byn:f.byn??0,full:!!f.full}:null);
   put("odo",data.odo,["odo","range"]); put("refunds",data.refunds,["byn"]);
   put("costs",data.costs,["byn","odo","periodMonths","lifeKm"]); put("reminders",data.reminders,["everyKm","lastOdo","everyMonths"]);
@@ -1723,7 +1724,7 @@ function iosHint(){
   try{ off=localStorage.getItem(IOS_HINT_KEY)==="1"; }catch(e){}
   el.hidden = !isIOS || isStandalone() || off;
   if(el.hidden) return;
-  const has=!DEMO && (S.sessions.length||S.costs.length||S.reminders.length||S.odoLog.length);
+  const has=!DEMO && (S.sessions.length||S.fuel.length||S.costs.length||S.reminders.length||S.odoLog.length);
   $("iosText").textContent="Установите приложение: кнопка «Поделиться» → На экран «Домой», и открывайте его с иконки. У Safari и у иконки разные хранилища: записи, внесённые здесь, в приложении с иконки не появятся."
     +(has?" Здесь уже есть записи — сохраните резервную копию («Настройки» → «Данные») и загрузите её в приложении с иконки.":"");
 }
@@ -1884,8 +1885,8 @@ function pickSheet(i){
   Object.assign(xi,{sheet:i, header:(rows[hi]||[]).map(cellText), data:rows.slice(hi+1), map:{}});
   const used=new Set();
   XFIELDS.forEach(fd=>{ const c=xi.header.findIndex((h,ci)=>h&&!used.has(ci)&&fd.re.test(h)&&!(fd.not&&fd.not.test(h))); if(c>=0){ xi.map[fd.k]=c; used.add(c); } });
-  xi.timeCol=xi.header.findIndex(h=>/^(время|time)$/i.test(h));
-  xi.defType="ac";   // rows without a type: chosen in the dialog (a charger app's log is usually home AC)   // date and time in separate columns (our old CSV)
+  xi.timeCol=xi.header.findIndex(h=>/^(время|time)$/i.test(h));   // date and time in separate columns (our old CSV)
+  xi.defType="ac";   // rows without a type: chosen in the dialog (a charger app's log is usually home AC)
   const texts=xi.data.flat().filter(v=>typeof v==="string").map(v=>v.trim());
   xi.dot=texts.some(v=>/^-?\d+\.\d+$/.test(v))&&!texts.some(v=>/^-?\d+,\d{1,2}$/.test(v));
   const h=xi.header.map(x=>x.toLowerCase());
@@ -1979,7 +1980,7 @@ armConfirm($("btnWipeOk"), async()=>{
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){
-  const n=S.sessions.length+S.costs.length; const el=$("bakBanner");
+  const n=S.sessions.length+S.costs.length+S.fuel.length; const el=$("bakBanner");
   if(n<5||DEMO){ el.hidden=true; return; }
   const last=S.backup&&S.backup.date?new Date(S.backup.date):null;
   const days=last?Math.floor((Date.now()-last)/864e5):null;

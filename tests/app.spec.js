@@ -259,9 +259,10 @@ const importJson = (page, data) =>
 
 test("подошедшее ТО — на «Обзоре» под пробегом и точкой на вкладке; нажатие открывает напоминание", async ({ page }) => {
   // ревью: напоминания жили только на 4-й вкладке, просроченное ТО было не видно
+  const far = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);   // далеко всегда, а не до определённого дня
   await page.goto("./");
   await importJson(page, { settings: { carName: "Т", purchaseDate: "2026-08-01", startOdo: 9800 }, sessions: [],
-    reminders: [{ id: "r1", title: "Перестановка шин", everyKm: 10000, lastOdo: 0 }, { id: "r2", title: "Страховка", dueDate: "2027-09-01", everyMonths: 12 }] });
+    reminders: [{ id: "r1", title: "Перестановка шин", everyKm: 10000, lastOdo: 0 }, { id: "r2", title: "Страховка", dueDate: far, everyMonths: 12 }] });
   const due = page.locator("#remDue");
   await expect(due).toBeVisible();
   await expect(due).toContainText("Перестановка шин");
@@ -1107,6 +1108,24 @@ test.describe("режим гибрида с розеткой", () => {
     await expect(page.locator("#f2fSec")).toBeHidden();               // «реальный запас» гибриду не показываем
     await page.click("#btnOdo");
     await expect(page.locator("#formOdo [name=range]")).toBeHidden(); // запас хода гибриду не нужен
+    await expect(page.locator("#formOdo [name=odo]")).toBeFocused();  // курсор — сразу в одометр
+  });
+
+  test("напоминание о резервной копии учитывает заправки", async ({ page }) => {
+    // ревью: плашка считала только зарядки и расходы — у гибрида с одними заправками её не было никогда
+    const fuel = [1, 2, 3, 4, 5].map(i => ({ id: `f${i}`, ts: `2026-07-0${i}T09:00`, station: "АЗС", liters: 40, byn: 100, odo: 10000 + i * 500, full: true }));
+    await page.goto("./");
+    await importJson(page, { exportedAt: "2026-07-06T10:00:00.000Z", settings: HYB.settings, sessions: [], fuel });
+    await expect(page.locator("#bakBanner")).toBeVisible();
+  });
+
+  test("стоимость владения у гибрида — вместе с бензином", async ({ page }) => {
+    // ревью: «Владение обходится в … на 100 км» у гибрида считалось только по зарядкам
+    await page.goto("./");
+    await importJson(page, { ...HYB, costs: [{ id: "k1", byn: 100, date: "2026-07-02", note: "Мойка", kind: "run" }] });
+    await page.click("#tabs [data-tab=costs]");
+    // энергия 15,7 на 100 км (как на «Обзоре») + мойка 100 BYN на 1 000 км = 10,0
+    await expect(page.locator("#ownNote")).toContainText("25,7 BYN на 100 км: 15,7 зарядки и бензин плюс 10,0 прочее");
   });
 
   test("пока полных баков меньше двух — «≈ по всем записям»", async ({ page }) => {
@@ -1487,6 +1506,15 @@ test.describe("дизайн-ревью: подписи, тёмная тема, �
     await expect(page.locator("#toast")).toHaveText("", { timeout: 4000 });
   });
 
+  for (const colorScheme of ["light", "dark"]) {
+    test(`страница конфиденциальности: контраст и размер ссылки «Вернуться» (${colorScheme === "light" ? "светлая" : "тёмная"} тема)`, async ({ page }) => {
+      // ревью: на ней остался прежний синий (4,21:1 на светлом фоне)
+      await page.emulateMedia({ colorScheme });
+      await page.goto("./privacy.html");
+      expect(await check(page)).toEqual({ small: [], low: [] });
+    });
+  }
+
   test("сообщения вроде «Зарядка сохранена» озвучиваются экранным диктором", async ({ page }) => {
     await page.goto("./");
     await expect(page.locator("#toast")).toHaveAttribute("role", "status");
@@ -1549,6 +1577,77 @@ test.describe("форма зарядки: у станции — одной ру�
     await expect(page.locator("#formSess [name=kwhBat]")).toHaveValue("37,6");                // запятая, как в остальных полях
     const box = await page.locator("#exactBox").boundingBox(), odo = await page.locator("#formSess [name=odo]").boundingBox();
     expect(odo.x + odo.width).toBeLessThanOrEqual(box.x + box.width + 0.5);                    // поля не вылезают за край
+  });
+});
+
+test("неизвестный тип зарядки из старой копии становится DC, а в форме тип всегда выбран", async ({ page }) => {
+  // ревью: «fast» из старой или правленой руками копии попадал в форму без выбранной кнопки и сохранялся как есть
+  await page.goto("./");
+  await importJson(page, { settings: { carName: "Т", purchaseDate: "2026-08-01", startOdo: 0 },
+    sessions: [{ id: "s1", ts: "2026-08-03T18:40", station: "Старая", kwh: 30, byn: 15, type: "fast" }] });
+  const docs = await page.evaluate(() => JSON.parse(localStorage.getItem("ev-tracker")).docs);
+  expect(docs["sessions/s1"].type).toBe("dc");
+  await page.click("#btnAdd");
+  await expect(page.locator("#typeSeg [aria-pressed=true]")).toHaveCount(1);
+});
+
+test("service worker без сети: страница — из кэша, отсутствующий файл — ошибка, а не index.html", async () => {
+  // ревью: на любой незакэшированный файл он отвечал index.html — HTML под видом картинки или шрифта.
+  // Запускаем сам sw.js с подставным кэшем и «сетью», которая всегда падает (Playwright не отключает сеть service worker'у)
+  const src = fs.readFileSync(path.join(__dirname, "..", "app", "sw.js"), "utf8");
+  const on = {};
+  const self = { addEventListener: (type, f) => { on[type] = f; }, skipWaiting() {}, clients: { claim() {} } };
+  const caches = { match: async req => (req === "index.html" ? "INDEX" : undefined), open: async () => ({ addAll: async () => {} }), keys: async () => [], delete: async () => {} };
+  const offline = async () => { throw new TypeError("offline"); };
+  new Function("self", "caches", "fetch", "location", "Request", src)(self, caches, offline, { origin: "https://x.test" }, function () {});
+  const get = mode => new Promise(done => on.fetch({ request: { method: "GET", url: "https://x.test/zaryadki/icons/net.png", mode },
+    respondWith: p => p.then(done, () => done("ошибка")) }));
+  expect(await get("navigate")).toBe("INDEX");     // открыть приложение без сети — можно
+  expect(await get("no-cors")).toBe("ошибка");     // а файла нет — честная ошибка
+});
+test.describe("два окна сразу: вкладка браузера и приложение со значка", () => {
+  // отзыв владельца: последняя зарядка «затёрлась». На Android вкладка и приложение со значка — одно хранилище.
+  // Окно, пролежавшее в фоне (Android его «усыпил») или вернувшееся кнопкой «назад», не знало о чужих изменениях
+  // и при сохранении записывало свою старую копию поверх всех данных
+  const sleepy = async context => {
+    const p = await context.newPage();
+    await p.addInitScript(() => window.addEventListener("storage", e => e.stopImmediatePropagation(), true));   // «проспало» чужие изменения
+    return p;
+  };
+  const addCharge = async (p, station) => {
+    await p.click("#btnAdd");
+    await p.fill("#formSess [name=station]", station);
+    await p.fill("#formSess [name=kwh]", "10");
+    await p.fill("#formSess [name=byn]", "5");
+    await p.click("#btnSaveSess");
+    await expect(p.locator("#dlgSess")).toBeHidden();
+  };
+  const stations = p => p.evaluate(() => Object.entries(JSON.parse(localStorage.getItem("ev-tracker")).docs)
+    .filter(([k]) => k.startsWith("sessions/")).map(([, v]) => v.station));
+
+  test("сохранение в отставшем окне не затирает зарядку из другого", async ({ context }) => {
+    const a = await sleepy(context);
+    await a.goto("./");
+    await importBackup(a);
+    const b = await context.newPage();
+    await b.goto("./");
+    await addCharge(b, "Из второго окна");
+    await addCharge(a, "Из первого окна");
+    const st = await stations(b);
+    expect(st).toContain("Из второго окна");
+    expect(st).toContain("Из первого окна");
+  });
+
+  test("окно, вернувшееся на экран, показывает свежие данные", async ({ context }) => {
+    const a = await sleepy(context);
+    await a.goto("./");
+    await importBackup(a);
+    const b = await context.newPage();
+    await b.goto("./");
+    await addCharge(b, "Свежая");
+    await a.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));   // переключились обратно на это окно
+    await a.click("#tabs [data-tab=sessions]");
+    await expect(a.locator("#list")).toContainText("Свежая");
   });
 });
 
