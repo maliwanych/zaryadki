@@ -1605,6 +1605,52 @@ test("service worker без сети: страница — из кэша, отс
   expect(await get("navigate")).toBe("INDEX");     // открыть приложение без сети — можно
   expect(await get("no-cors")).toBe("ошибка");     // а файла нет — честная ошибка
 });
+test.describe("два окна сразу: вкладка браузера и приложение со значка", () => {
+  // отзыв владельца: последняя зарядка «затёрлась». На Android вкладка и приложение со значка — одно хранилище.
+  // Окно, пролежавшее в фоне (Android его «усыпил») или вернувшееся кнопкой «назад», не знало о чужих изменениях
+  // и при сохранении записывало свою старую копию поверх всех данных
+  const sleepy = async context => {
+    const p = await context.newPage();
+    await p.addInitScript(() => window.addEventListener("storage", e => e.stopImmediatePropagation(), true));   // «проспало» чужие изменения
+    return p;
+  };
+  const addCharge = async (p, station) => {
+    await p.click("#btnAdd");
+    await p.fill("#formSess [name=station]", station);
+    await p.fill("#formSess [name=kwh]", "10");
+    await p.fill("#formSess [name=byn]", "5");
+    await p.click("#btnSaveSess");
+    await expect(p.locator("#dlgSess")).toBeHidden();
+  };
+  const stations = p => p.evaluate(() => Object.entries(JSON.parse(localStorage.getItem("ev-tracker")).docs)
+    .filter(([k]) => k.startsWith("sessions/")).map(([, v]) => v.station));
+
+  test("сохранение в отставшем окне не затирает зарядку из другого", async ({ context }) => {
+    const a = await sleepy(context);
+    await a.goto("./");
+    await importBackup(a);
+    const b = await context.newPage();
+    await b.goto("./");
+    await addCharge(b, "Из второго окна");
+    await addCharge(a, "Из первого окна");
+    const st = await stations(b);
+    expect(st).toContain("Из второго окна");
+    expect(st).toContain("Из первого окна");
+  });
+
+  test("окно, вернувшееся на экран, показывает свежие данные", async ({ context }) => {
+    const a = await sleepy(context);
+    await a.goto("./");
+    await importBackup(a);
+    const b = await context.newPage();
+    await b.goto("./");
+    await addCharge(b, "Свежая");
+    await a.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));   // переключились обратно на это окно
+    await a.click("#tabs [data-tab=sessions]");
+    await expect(a.locator("#list")).toContainText("Свежая");
+  });
+});
+
 test("барабаны показывают сумму точно, даже если зарядку добавили с другой вкладки", async ({ page }) => {
   // ревью: высота цифры мерялась на экране; пока «Обзор» скрыт, она была 0 и барабаны вставали между цифрами
   await page.goto("./");

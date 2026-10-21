@@ -620,10 +620,14 @@ const DEMO = (()=>{ try{ return sessionStorage.getItem(DEMO_KEY)==="1" && localS
 
 /* ---------- local storage with the same small API the tracker already uses ---------- */
 function LocalDB(key){
-  const load=()=>{ try{ const o=JSON.parse(localStorage.getItem(key)||"null"); return (o&&o.docs)||{}; }catch(e){ return {}; } };
+  let raw=null;   // the stored text as last read or written: tells whether another window wrote since
+  const load=()=>{ try{ raw=localStorage.getItem(key); const o=JSON.parse(raw||"null"); return (o&&o.docs)||{}; }catch(e){ return {}; } };
   let docs=load();
   const subs=new Set();
-  const save=()=>localStorage.setItem(key, JSON.stringify({schema:1, docs}));   // throws on quota → caller shows a toast
+  const save=()=>{ const s=JSON.stringify({schema:1, docs}); localStorage.setItem(key, s); raw=s; };   // throws on quota → caller shows a toast
+  // a browser tab next to the installed app share this storage; one that slept in the background may hold old data.
+  // So every write starts from what is stored now and changes only its own records — never an old copy over a newer one
+  const fresh=()=>{ docs=load(); };
   const notify=()=>subs.forEach(f=>f());   // in the order of subscription
   const snap=p=>{ const d=docs[p]; return {id:p.split("/").pop(), exists:d!==undefined, data:()=>d}; };
   const depth=p=>p.split("/").length;
@@ -632,16 +636,20 @@ function LocalDB(key){
   const sub=f=>{ subs.add(f); f(); return ()=>subs.delete(f); };
   const doc=p=>({ id:p.split("/").pop(), path:p,
     get:async()=>snap(p),
-    set:async d=>{ const prev=docs[p]; docs[p]=JSON.parse(JSON.stringify(d)); try{ save(); }catch(e){ if(prev===undefined) delete docs[p]; else docs[p]=prev; throw e; } notify(); },
-    delete:async()=>{ const prev=docs[p]; delete docs[p]; try{ save(); }catch(e){ docs[p]=prev; throw e; } notify(); },
+    set:async d=>{ fresh(); const prev=docs[p]; docs[p]=JSON.parse(JSON.stringify(d)); try{ save(); }catch(e){ if(prev===undefined) delete docs[p]; else docs[p]=prev; throw e; } notify(); },
+    delete:async()=>{ fresh(); const prev=docs[p]; delete docs[p]; try{ save(); }catch(e){ docs[p]=prev; throw e; } notify(); },
     onSnapshot:(n)=>sub(()=>n(snap(p))) });
   const collection=c=>({ path:c, doc:id=>doc(`${c}/${id||LocalDB.newId()}`), onSnapshot:(n)=>sub(()=>{ const d=colDocs(c); n({docs:d,size:d.length,empty:!d.length}); }) });
   // another tab or window changed the data
   window.addEventListener("storage",e=>{ if(e.key===key){ docs=load(); notify(); } });
+  // back on screen (from another app or tab, or restored by «назад»): a sleeping window may have missed that event
+  const reread=()=>{ let r; try{ r=localStorage.getItem(key); }catch(e){ return; } if(r!==raw){ docs=load(); notify(); } };
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") reread(); });
+  window.addEventListener("pageshow",e=>{ if(e.persisted) reread(); });
   // after every change, once — subscribed last, it runs after all onSnapshot handlers have read the new data
   const onChange=f=>sub(f);
   return { doc, collection, onChange, replaceAll:(d)=>{ const prev=docs; docs=d; try{ save(); }catch(e){ docs=prev; throw e; } notify(); },
-    setMany:(pairs)=>{ const prev={...docs}; pairs.forEach(([p,d])=>{ docs[p]=JSON.parse(JSON.stringify(d)); }); try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
+    setMany:(pairs)=>{ fresh(); const prev={...docs}; pairs.forEach(([p,d])=>{ docs[p]=JSON.parse(JSON.stringify(d)); }); try{ save(); }catch(e){ docs=prev; throw e; } notify(); } };
 }
 LocalDB.newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
