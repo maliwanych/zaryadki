@@ -611,7 +611,7 @@ let RD = [];   // odometer readings, rebuilt on every render
 // a charge is already "inside" a reading if it happened at or before that odometer value (or, without odometer, not later than 30 min after it)
 const inBefore = (s,R) => s.odo!=null ? s.odo<=R.odo : new Date(s.ts) <= new Date(R.t.getTime()+30*60000);
 
-const APP_VERSION = "1.0.28";
+const APP_VERSION = "1.0.29";
 const CURRENCIES = {BYN:"BYN", RUB:"₽"};   // stored code → label; amounts are plain numbers, only the label changes
 const DB_KEY = "ev-tracker";
 const DEMO_KEY = DB_KEY+"-demo";
@@ -1980,13 +1980,15 @@ armConfirm($("btnWipeOk"), async()=>{
 
 /* ---------- remind about backups: the data lives only on this phone ---------- */
 function backupNag(){
-  const n=S.sessions.length+S.costs.length+S.fuel.length; const el=$("bakBanner");
-  if(n<5||DEMO){ el.hidden=true; return; }
+  const el=$("bakBanner"), n=S.sessions.length+S.costs.length+S.fuel.length;
+  if(DEMO||!n){ el.hidden=true; return; }
   const last=S.backup&&S.backup.date?new Date(S.backup.date):null;
-  const days=last?Math.floor((Date.now()-last)/864e5):null;
-  if(days!=null && days<30){ el.hidden=true; return; }
-  $("bakText").textContent = days==null ? "Данные есть только на этом телефоне. Сохраните резервную копию." : `Последняя копия — ${days} дн. назад.`;
-  el.hidden=false;
+  // added after the last copy: charges and fill-ups by their time, costs by their day
+  const added=last ? S.sessions.filter(x=>new Date(x.ts)>last).length+S.fuel.filter(x=>new Date(x.ts)>last).length+S.costs.filter(c=>c.date&&new Date(c.date+"T23:59")>last).length : n;
+  // a copy is due when there is something to lose: none yet (from the 3rd record), 10 new records, or a week with anything new
+  const due=last ? added>=10 || (added>0 && Date.now()-last>=7*864e5) : n>=3;
+  el.hidden=!due; if(!due) return;
+  $("bakText").textContent = last ? `После последней копии — ${added} ${plural(added,"новая запись","новые записи","новых записей")}.` : "Данные есть только на этом телефоне. Сохраните резервную копию.";
 }
 
 /* ---------- boot ---------- */
