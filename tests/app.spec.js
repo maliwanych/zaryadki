@@ -1115,7 +1115,8 @@ test.describe("режим гибрида с розеткой", () => {
     // ревью: плашка считала только зарядки и расходы — у гибрида с одними заправками её не было никогда
     const fuel = [1, 2, 3, 4, 5].map(i => ({ id: `f${i}`, ts: `2026-07-0${i}T09:00`, station: "АЗС", liters: 40, byn: 100, odo: 10000 + i * 500, full: true }));
     await page.goto("./");
-    await importJson(page, { exportedAt: "2026-07-06T10:00:00.000Z", settings: HYB.settings, sessions: [], fuel });
+    // копия сделана до этих заправок — значит, они новые
+    await importJson(page, { exportedAt: "2026-07-01T00:00:00.000Z", settings: HYB.settings, sessions: [], fuel });
     await expect(page.locator("#bakBanner")).toBeVisible();
   });
 
@@ -1695,6 +1696,56 @@ test("бесплатные зарядки: зелёная полоска в сп
   await expect(page.locator("#months")).toContainText("сэкономлено");
   await page.click("#tabs [data-tab=sessions]");
   await expect(page.locator("#list .sess .stripe.t-free")).toHaveCount(1);
+});
+
+test.describe("напоминание о резервной копии — по новым записям", () => {
+  // решение владельца (22.10.2026): облачной копии нет, ручная — удобнее и чаще; данные терялись при удалении значка
+  const ago = days => new Date(Date.now() - days * 864e5).toISOString();
+  const charges = n => Array.from({ length: n }, (_, i) => ({ id: `n${i}`, ts: ago(1).slice(0, 16), station: "Станция", kwh: 10 + i, byn: 5 }));
+  const withCopy = (page, copyDaysAgo, n) => importJson(page, { exportedAt: ago(copyDaysAgo), settings: { carName: "Т", purchaseDate: "2026-08-01", startOdo: 0 }, sessions: charges(n) });
+
+  test("копии не было — плашка с третьей записи, «Сохранить копию» её убирает", async ({ page }) => {
+    await page.goto("./");
+    for (const kwh of ["10", "11"]) {
+      await page.click("#btnAdd"); await page.fill("#formSess [name=kwh]", kwh); await page.fill("#formSess [name=byn]", "5"); await page.click("#btnSaveSess");
+      await expect(page.locator("#dlgSess")).toBeHidden();
+    }
+    await expect(page.locator("#bakBanner")).toBeHidden();
+    await page.click("#btnAdd"); await page.fill("#formSess [name=kwh]", "12"); await page.fill("#formSess [name=byn]", "5"); await page.click("#btnSaveSess");
+    await expect(page.locator("#bakBanner")).toBeVisible();
+    await expect(page.locator("#bakText")).toContainText("только на этом телефоне");
+    await Promise.all([page.waitForEvent("download"), page.click("#btnBak2")]);
+    await expect(page.locator("#bakBanner")).toBeHidden();
+  });
+
+  test("неделя с новой записью — плашка «После последней копии — 1 новая запись»", async ({ page }) => {
+    await page.goto("./");
+    await withCopy(page, 8, 1);
+    await expect(page.locator("#bakText")).toHaveText("После последней копии — 1 новая запись.")   // число и слово не разрываются переносом;
+  });
+
+  test("меньше недели — молчит, пока не наберётся 10 новых записей", async ({ page, context }) => {
+    await page.goto("./");
+    await withCopy(page, 2, 9);
+    await expect(page.locator("#fKwh")).not.toHaveText("0,0");
+    await expect(page.locator("#bakBanner")).toBeHidden();
+    const p2 = await context.newPage();
+    await p2.goto("./");
+    await p2.evaluate(() => localStorage.clear());
+    await p2.reload();
+    await withCopy(p2, 2, 10);
+    await expect(p2.locator("#bakText")).toHaveText("После последней копии — 10 новых записей.");
+  });
+
+  test("после копии без новых записей плашки нет, сколько бы времени ни прошло", async ({ page }) => {
+    await page.goto("./");
+    await withCopy(page, 60, 0);
+    await page.click("#btnAdd"); await page.fill("#formSess [name=kwh]", "10"); await page.fill("#formSess [name=byn]", "5");
+    await page.click("#btnWhen"); await page.fill("#formSess [name=ts]", ago(90).slice(0, 16));   // давняя зарядка, внесённая задним числом
+    await page.click("#btnSaveSess");
+    await expect(page.locator("#fKwh")).not.toHaveText("0,0");
+    await expect(page.locator("#bakBanner")).toBeHidden();
+  });
 });
 
 test("значки: размеры как в manifest, у значков для iPhone и Android-маски нет прозрачных углов, все — в офлайн-кэше", async ({ page }) => {
